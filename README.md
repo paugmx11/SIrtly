@@ -203,6 +203,13 @@ npm run dev
 - Si usas `SESSION_DRIVER=database`, asegúrate de tener la tabla `sessions` creada.
 - Para pruebas, usa Postman con `Authorization: Bearer <token>`.
 
+## Tablas de autenticación
+**`sessions`**
+Se usa cuando `SESSION_DRIVER=database`. Almacena las sesiones del middleware `web` (por ejemplo al entrar a `/`).
+
+**`personal_access_tokens`**
+La usa Laravel Sanctum para autenticación por token en la API. Cada login crea un token que se guarda aquí y se envía como `Authorization: Bearer <token>`.
+
 ## Estructura del proyecto
 ```
 sirtly
