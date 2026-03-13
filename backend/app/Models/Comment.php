@@ -5,17 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class IncidentAttachment extends Model
+class Comment extends Model
 {
-    protected $table = 'incident_attachments';
+    protected $table = 'incident_comments';
 
     protected $fillable = [
         'incident_id',
-        'file_path',
-        'uploaded_by',
+        'user_id',
+        'comment',
     ];
 
-    const CREATED_AT = 'uploaded_at';
+    const CREATED_AT = 'created_at';
     const UPDATED_AT = null;
 
     public function incident(): BelongsTo
@@ -23,8 +23,8 @@ class IncidentAttachment extends Model
         return $this->belongsTo(Incident::class);
     }
 
-    public function uploader(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'uploaded_by');
+        return $this->belongsTo(User::class);
     }
 }
