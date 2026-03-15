@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Incident;
 use App\Models\IncidentStatus;
 use App\Models\IncidentStatusHistory;
+use App\Models\CompanySetting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -68,6 +69,27 @@ class IncidentController extends Controller
             }
         }
 
+        $assignmentMode = CompanySetting::where('company_id', $user->company_id)->value('assignment_mode') ?? 'manual';
+
+        $assignedTo = $validated['assigned_to'] ?? null;
+        if (!$assignedTo && $assignmentMode !== 'manual') {
+            $technicians = User::where('company_id', $user->company_id)
+                ->whereHas('role', function ($q) {
+                    $q->where('name', 'tecnico');
+                });
+
+            if ($assignmentMode === 'specialty' && !empty($validated['category'])) {
+                $assignedTo = (clone $technicians)
+                    ->where('specialty', 'LIKE', '%' . $validated['category'] . '%')
+                    ->orderBy('id')
+                    ->value('id');
+            }
+
+            if (!$assignedTo && $assignmentMode === 'auto') {
+                $assignedTo = (clone $technicians)->orderBy('id')->value('id');
+            }
+        }
+
         $defaultStatus = IncidentStatus::where('name', self::STATUS_MAP['open'])->first();
         if (!$defaultStatus) {
             return response()->json(['message' => 'Default status not configured.'], 422);
@@ -76,7 +98,7 @@ class IncidentController extends Controller
         $incident = Incident::create([
             'company_id' => $user->company_id,
             'created_by' => $user->id,
-            'assigned_to' => $validated['assigned_to'] ?? null,
+            'assigned_to' => $assignedTo,
             'status_id' => $defaultStatus->id,
             'title' => $validated['title'],
             'description' => $validated['description'],
@@ -135,6 +157,41 @@ class IncidentController extends Controller
             'status_id' => $status->id,
             'changed_by' => $user->id,
         ]);
+
+        return response()->json(['incident' => $incident]);
+    }
+
+    public function assign(Request $request, int $id)
+    {
+        $user = $request->user();
+        $roleName = $user->role ? $user->role->name : null;
+
+        $incident = Incident::findOrFail($id);
+
+        if ($roleName === 'tecnico') {
+            if ($incident->company_id !== $user->company_id) {
+                return response()->json(['message' => 'Not authorized.'], 403);
+            }
+            $incident->assigned_to = $user->id;
+        } elseif ($roleName === 'jefe_empresa') {
+            if ($incident->company_id !== $user->company_id) {
+                return response()->json(['message' => 'Not authorized.'], 403);
+            }
+            $validated = $request->validate([
+                'assigned_to' => ['required', 'integer', 'exists:users,id'],
+            ]);
+            $sameCompany = User::where('id', $validated['assigned_to'])
+                ->where('company_id', $user->company_id)
+                ->exists();
+            if (!$sameCompany) {
+                return response()->json(['message' => 'Assignee must belong to your company.'], 422);
+            }
+            $incident->assigned_to = $validated['assigned_to'];
+        } else {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        $incident->save();
 
         return response()->json(['incident' => $incident]);
     }

@@ -14,9 +14,21 @@ class CompanySetting extends Model
         'primary_color',
         'secondary_color',
         'logo',
+        'system_name',
+        'favicon',
+        'assignment_mode',
+        'categories',
+        'priorities',
+        'departments',
+        'specialties',
     ];
 
-    public $timestamps = false;
+    protected $casts = [
+        'categories' => 'array',
+        'priorities' => 'array',
+        'departments' => 'array',
+        'specialties' => 'array',
+    ];
 
     public function company(): BelongsTo
     {

@@ -22,10 +22,31 @@
 - `POST /api/auth/login`
 - `POST /api/auth/registerCompany` (requiere `admin` autenticado)
 - `POST /api/auth/registerUser` (requiere `admin` o `jefe_empresa`)
+- `GET /api/companies` (admin/supervisor)
+- `POST /api/companies` (admin)
+- `PUT /api/companies/{id}` (admin)
+- `GET /api/users` (admin/jefe_empresa)
+- `POST /api/users` (admin/jefe_empresa)
+- `PUT /api/users/{id}` (admin/jefe_empresa)
+- `DELETE /api/users/{id}` (admin/jefe_empresa)
 - `GET /api/incidents`
 - `GET /api/incidents/{id}`
 - `POST /api/incidents` (solo `empleado`)
 - `PATCH /api/incidents/{id}/status` (solo `tecnico`)
+- `PATCH /api/incidents/{id}/assign` (tecnico o jefe_empresa)
+- `GET /api/incidents/{id}/comments`
+- `POST /api/incidents/{id}/comments`
+- `GET /api/incidents/{id}/attachments`
+- `POST /api/incidents/{id}/attachments`
+- `GET /api/company-settings`
+- `PUT /api/company-settings`
+- `GET /api/stats/system` (admin/supervisor)
+- `GET /api/stats/company` (jefe_empresa)
+- `GET /api/stats/by-company` (admin/supervisor)
+- `GET /api/stats/by-technician` (jefe_empresa)
+
+## Frontend
+El frontend consume la API real (no hay datos mock). El rol del usuario se determina desde el backend en el login.
 
 ## Base de datos (MySQL)
 Usa el archivo `.sql` en la raíz. Esquema actualizado:
@@ -53,6 +74,15 @@ CREATE TABLE company_settings (
    primary_color VARCHAR(20),
    secondary_color VARCHAR(20),
    logo VARCHAR(255),
+   system_name VARCHAR(150),
+   favicon VARCHAR(255),
+   assignment_mode ENUM('manual','auto','specialty') DEFAULT 'manual',
+   categories JSON,
+   priorities JSON,
+   departments JSON,
+   specialties JSON,
+   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+   updated_at TIMESTAMP NULL,
    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 );
 
@@ -164,6 +194,11 @@ CREATE TABLE incident_attachments (
    FOREIGN KEY (incident_id) REFERENCES incidents(id),
    FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
+
+-- SEED DATA (demo)
+-- Incluye roles, empresas, usuarios, incidencias, comentarios y adjuntos
+-- Password demo para usuarios: asdqwe123
+-- Puedes ejecutar el .sql completo o solo la sección de seed al final.
 ```
 
 ## Backend (Laravel API)
@@ -197,6 +232,12 @@ cd frontend
 npm install
 npm run dev
 ```
+
+## Datos de demo
+El archivo `.sql` ahora incluye datos de ejemplo (usuarios, empresas, incidencias, comentarios, adjuntos).
+Usuario admin demo:
+- email: `admin@sistema.com`
+- password: `asdqwe123`
 
 ## Notas importantes
 - El login es único para todos los roles.
