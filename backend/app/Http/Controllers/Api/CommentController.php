@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\Incident;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 
 class CommentController extends Controller
@@ -43,6 +44,20 @@ class CommentController extends Controller
             'user_id' => $user->id,
             'comment' => $validated['comment'],
         ]);
+
+        $targets = collect([$incident->assigned_to, $incident->created_by])
+            ->filter()
+            ->unique()
+            ->reject(fn ($id) => $id === $user->id);
+
+        foreach ($targets as $targetId) {
+            Notification::create([
+                'user_id' => $targetId,
+                'type' => 'comment',
+                'title' => 'Nuevo comentario',
+                'body' => 'Nuevo comentario en: ' . $incident->title,
+            ]);
+        }
 
         return response()->json(['comment' => $comment], 201);
     }

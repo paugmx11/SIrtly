@@ -7,6 +7,7 @@ use App\Models\Incident;
 use App\Models\IncidentStatus;
 use App\Models\IncidentStatusHistory;
 use App\Models\CompanySetting;
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -106,6 +107,15 @@ class IncidentController extends Controller
             'priority' => $validated['priority'] ?? 'medium',
         ]);
 
+        if ($assignedTo) {
+            Notification::create([
+                'user_id' => $assignedTo,
+                'type' => 'incident',
+                'title' => 'Incidencia asignada',
+                'body' => 'Se te asignó: ' . $incident->title,
+            ]);
+        }
+
         return response()->json(['incident' => $incident], 201);
     }
 
@@ -158,6 +168,20 @@ class IncidentController extends Controller
             'changed_by' => $user->id,
         ]);
 
+        $targets = collect([$incident->assigned_to, $incident->created_by])
+            ->filter()
+            ->unique()
+            ->reject(fn ($id) => $id === $user->id);
+
+        foreach ($targets as $targetId) {
+            Notification::create([
+                'user_id' => $targetId,
+                'type' => 'incident',
+                'title' => 'Estado actualizado',
+                'body' => 'La incidencia "' . $incident->title . '" cambió a ' . $status->name,
+            ]);
+        }
+
         return response()->json(['incident' => $incident]);
     }
 
@@ -193,6 +217,70 @@ class IncidentController extends Controller
 
         $incident->save();
 
+        $targets = collect([$incident->assigned_to, $incident->created_by])
+            ->filter()
+            ->unique()
+            ->reject(fn ($id) => $id === $user->id);
+
+        foreach ($targets as $targetId) {
+            Notification::create([
+                'user_id' => $targetId,
+                'type' => 'incident',
+                'title' => 'Incidencia asignada',
+                'body' => 'Se te asignó: ' . $incident->title,
+            ]);
+        }
+
         return response()->json(['incident' => $incident]);
+    }
+
+    public function update(Request $request, int $id)
+    {
+        $user = $request->user();
+        $roleName = $user->role?->name;
+
+        $incident = Incident::findOrFail($id);
+        if (in_array($roleName, ['admin', 'supervisor'], true)) {
+            // ok
+        } elseif ($roleName === 'jefe_empresa') {
+            if ($incident->company_id !== $user->company_id) {
+                return response()->json(['message' => 'Not authorized.'], 403);
+            }
+        } else {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'string'],
+            'category' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'priority' => ['sometimes', Rule::in(['low', 'medium', 'high', 'urgent'])],
+        ]);
+
+        $incident->fill($validated);
+        $incident->save();
+
+        return response()->json(['incident' => $incident]);
+    }
+
+    public function destroy(Request $request, int $id)
+    {
+        $user = $request->user();
+        $roleName = $user->role?->name;
+
+        $incident = Incident::findOrFail($id);
+        if (in_array($roleName, ['admin', 'supervisor'], true)) {
+            // ok
+        } elseif ($roleName === 'jefe_empresa') {
+            if ($incident->company_id !== $user->company_id) {
+                return response()->json(['message' => 'Not authorized.'], 403);
+            }
+        } else {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        $incident->delete();
+
+        return response()->json(['message' => 'Incident deleted.']);
     }
 }

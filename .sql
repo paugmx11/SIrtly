@@ -131,6 +131,18 @@ CREATE TABLE incident_attachments (
    FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
 
+-- NOTIFICACIONES
+CREATE TABLE notifications (
+   id INT AUTO_INCREMENT PRIMARY KEY,
+   user_id INT NOT NULL,
+   type VARCHAR(50) NOT NULL,
+   title VARCHAR(150) NOT NULL,
+   body TEXT,
+   read_at TIMESTAMP NULL,
+   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- SEED DATA (demo)
 -- Roles
 INSERT INTO roles (id, name) VALUES
@@ -214,3 +226,9 @@ VALUES
 INSERT INTO incident_attachments (incident_id, file_path, uploaded_by, uploaded_at)
 VALUES
 (100, 'attachments/demo-error-mail.pdf', 30, '2024-12-15 09:35:00');
+
+-- Notifications
+INSERT INTO notifications (user_id, type, title, body, read_at, created_at)
+VALUES
+(2, 'incident', 'Nueva incidencia', 'Se creó una incidencia en TechSolutions S.L.', NULL, NOW()),
+(20, 'incident', 'Incidencia asignada', 'Se te asignó: Error en servidor de correo', NULL, NOW());

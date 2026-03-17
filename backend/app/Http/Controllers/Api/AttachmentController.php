@@ -36,7 +36,7 @@ class AttachmentController extends Controller
             'file' => ['required', 'file', 'max:10240'],
         ]);
 
-        $path = $request->file('file')->store('attachments');
+        $path = $request->file('file')->store('attachments', 'public');
 
         $attachment = IncidentAttachment::create([
             'incident_id' => $incident->id,
@@ -44,6 +44,9 @@ class AttachmentController extends Controller
             'uploaded_by' => $user->id,
         ]);
 
-        return response()->json(['attachment' => $attachment], 201);
+        return response()->json([
+            'attachment' => $attachment,
+            'url' => asset('storage/' . $path),
+        ], 201);
     }
 }
