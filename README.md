@@ -20,6 +20,7 @@
 
 ## Endpoints principales (API)
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `POST /api/auth/registerCompany` (requiere `admin` autenticado)
 - `POST /api/auth/registerUser` (requiere `admin` o `jefe_empresa`)
 - `GET /api/companies` (admin/supervisor)
@@ -44,6 +45,9 @@
 - `GET /api/stats/company` (jefe_empresa)
 - `GET /api/stats/by-company` (admin/supervisor)
 - `GET /api/stats/by-technician` (jefe_empresa)
+- `GET /api/notifications`
+- `POST /api/notifications/{id}/read`
+- `POST /api/notifications/read-all`
 
 ## Frontend
 El frontend consume la API real (no hay datos mock). El rol del usuario se determina desde el backend en el login.
@@ -195,6 +199,18 @@ CREATE TABLE incident_attachments (
    FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
 
+-- NOTIFICACIONES
+CREATE TABLE notifications (
+   id INT AUTO_INCREMENT PRIMARY KEY,
+   user_id INT NOT NULL,
+   type VARCHAR(50) NOT NULL,
+   title VARCHAR(150) NOT NULL,
+   body TEXT,
+   read_at TIMESTAMP NULL,
+   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+   FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- SEED DATA (demo)
 -- Incluye roles, empresas, usuarios, incidencias, comentarios y adjuntos
 -- Password demo para usuarios: asdqwe123
@@ -219,6 +235,7 @@ SESSION_DRIVER=database
 cd backend
 composer install
 php artisan key:generate
+php artisan storage:link
 ```
 
 **Arranque**
@@ -234,7 +251,7 @@ npm run dev
 ```
 
 ## Datos de demo
-El archivo `.sql` ahora incluye datos de ejemplo (usuarios, empresas, incidencias, comentarios, adjuntos).
+El archivo `.sql` ahora incluye datos de ejemplo (usuarios, empresas, incidencias, comentarios, adjuntos, notificaciones).
 Usuario admin demo:
 - email: `admin@sistema.com`
 - password: `asdqwe123`

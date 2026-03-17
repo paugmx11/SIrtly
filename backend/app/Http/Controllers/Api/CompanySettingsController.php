@@ -14,7 +14,7 @@ class CompanySettingsController extends Controller
         $user = $request->user();
         $role = $user->role ? $user->role->name : null;
 
-        if ($role !== 'jefe_empresa') {
+        if (!in_array($role, ['jefe_empresa', 'tecnico', 'empleado'], true)) {
             return response()->json(['message' => 'Not authorized.'], 403);
         }
 

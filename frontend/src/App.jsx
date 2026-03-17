@@ -9,6 +9,13 @@ const ROLE_LABELS = {
   empleado: 'Empleado',
 }
 
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Baja' },
+  { value: 'medium', label: 'Media' },
+  { value: 'high', label: 'Alta' },
+  { value: 'urgent', label: 'Crítica' },
+]
+
 const ADMIN_MENU = [
   { key: 'admin-dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'admin-empresas', label: 'Empresas', icon: 'building' },
@@ -45,6 +52,7 @@ const TECNICO_MENU = [
 ]
 
 const API_BASE = 'http://127.0.0.1:8000/api'
+const API_ROOT = API_BASE.replace('/api', '')
 
 function App() {
   const [token, setToken] = useState('')
@@ -52,6 +60,10 @@ function App() {
   const [role, setRole] = useState('admin')
   const [view, setView] = useState('admin-dashboard')
   const [selectedIncidentId, setSelectedIncidentId] = useState(null)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedUserSource, setSelectedUserSource] = useState(null)
+  const [notifications, setNotifications] = useState([])
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
 
   const [data, setData] = useState({
     companies: [],
@@ -63,6 +75,7 @@ function App() {
     byTechnician: [],
     settings: null,
     comments: [],
+    attachments: [],
   })
 
   const menu = useMemo(() => {
@@ -81,7 +94,7 @@ function App() {
 
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
 
@@ -97,10 +110,12 @@ function App() {
   }
 
   const apiFetch = async (path, options = {}) => {
+    const isFormData = options.body instanceof FormData
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        'Accept': 'application/json',
         Authorization: `Bearer ${token}`,
         ...(options.headers || {}),
       },
@@ -126,11 +141,14 @@ function App() {
       if (role === 'jefe_empresa') {
         updates.statsCompany = (await apiFetch('/stats/company'))
         updates.byTechnician = (await apiFetch('/stats/by-technician')).by_technician || []
+      }
+      if (role === 'jefe_empresa' || role === 'empleado' || role === 'tecnico') {
         updates.settings = (await apiFetch('/company-settings')).settings || null
       }
       updates.incidents = (await apiFetch('/incidents')).incidents || []
+      setNotifications((await apiFetch('/notifications')).notifications || [])
     } catch (e) {
-      // ignore for now
+      // ignore
     }
 
     setData(updates)
@@ -179,8 +197,27 @@ function App() {
     )
   }
 
-  const activeKey = resolveActiveKey(view)
+  const activeKey = resolveActiveKey(view, selectedUserSource)
   const profileName = `${user?.name || ''} ${user?.last_name || ''}`.trim() || 'Usuario'
+  const unreadCount = notifications.filter((n) => !n.read_at).length
+
+  const markNotificationRead = async (id) => {
+    try {
+      await apiFetch(`/notifications/${id}/read`, { method: 'POST' })
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)))
+    } catch {
+      // ignore
+    }
+  }
+
+  const markAllRead = async () => {
+    try {
+      await apiFetch('/notifications/read-all', { method: 'POST' })
+      setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })))
+    } catch {
+      // ignore
+    }
+  }
 
   return (
     <div className="app">
@@ -211,14 +248,46 @@ function App() {
             <div className="profile-role">{ROLE_LABELS[role]}</div>
           </div>
         </div>
-        <button className="logout" onClick={() => setToken('')}>Cerrar sesión</button>
+        <button className="logout" onClick={async () => {
+          try { await apiFetch('/auth/logout', { method: 'POST' }) } catch { }
+          setToken('')
+        }}>Cerrar sesión</button>
       </aside>
 
       <div className="content">
         <header className="topbar">
           <div className="topbar__title">{resolveTitle(view)}</div>
           <div className="topbar__actions">
-            <div className="bell" />
+            <div className="notifications">
+              <button
+                className="bell"
+                title={`${notifications.length} notificaciones`}
+                onClick={() => setNotificationsOpen((v) => !v)}
+              >
+                {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+              </button>
+              {notificationsOpen && (
+                <div className="notifications__panel">
+                  <div className="notifications__header">
+                    <span>Notificaciones</span>
+                    <button className="link" onClick={markAllRead}>Marcar todo leído</button>
+                  </div>
+                  {notifications.length === 0 && <div className="muted">Sin notificaciones</div>}
+                  <ul>
+                    {notifications.map((n) => (
+                      <li key={n.id} className={n.read_at ? '' : 'unread'}>
+                        <div className="notif-title">{n.title}</div>
+                        <div className="notif-body">{n.body}</div>
+                        <div className="notif-meta">
+                          <span>{formatDate(n.created_at)}</span>
+                          {!n.read_at && <button className="link" onClick={() => markNotificationRead(n.id)}>Marcar leído</button>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
             <div className="profile">
               <div className="avatar">{profileName[0]}</div>
               <span>{profileName}</span>
@@ -233,6 +302,12 @@ function App() {
             selectedIncidentId,
             apiFetch,
             loadAll,
+            selectedUser,
+            setSelectedUser,
+            selectedUserSource,
+            setSelectedUserSource,
+            notifications,
+            setNotifications,
           })}
         </main>
       </div>
@@ -251,6 +326,7 @@ function resolveTitle(view) {
     'admin-admins-create': 'Crear administrador',
     'admin-supervisores': 'Supervisores',
     'admin-supervisores-create': 'Crear supervisor',
+    'admin-user-edit': 'Editar usuario',
     'admin-estadisticas': 'Estadísticas',
     'sup-dashboard': 'Dashboard',
     'sup-empresas': 'Empresas',
@@ -258,14 +334,18 @@ function resolveTitle(view) {
     'jefe-dashboard': 'Dashboard',
     'jefe-empleados': 'Empleados',
     'jefe-empleados-create': 'Crear empleado',
+    'jefe-empleados-edit': 'Editar empleado',
     'jefe-tecnicos': 'Técnicos',
     'jefe-tecnicos-create': 'Crear técnico',
+    'jefe-tecnicos-edit': 'Editar técnico',
     'jefe-incidencias': 'Incidencias',
+    'jefe-incidencias-edit': 'Editar incidencia',
     'jefe-estadisticas': 'Estadísticas',
     'jefe-config': 'Configuración de empresa',
     'emp-dashboard': 'Dashboard',
     'emp-mis': 'Mis incidencias',
     'emp-crear': 'Crear incidencia',
+    'emp-edit': 'Editar incidencia',
     'tec-dashboard': 'Dashboard',
     'tec-asignadas': 'Incidencias asignadas',
     'tec-gestionar': 'Gestionar incidencia',
@@ -273,30 +353,55 @@ function resolveTitle(view) {
   return titles[view] || 'Dashboard'
 }
 
-function resolveActiveKey(view) {
+function resolveActiveKey(view, selectedUserSource) {
   const map = {
     'admin-empresas-create': 'admin-empresas',
     'admin-jefes-create': 'admin-jefes',
     'admin-admins-create': 'admin-admins',
     'admin-supervisores-create': 'admin-supervisores',
+    'admin-user-edit': selectedUserSource || 'admin-jefes',
     'jefe-empleados-create': 'jefe-empleados',
+    'jefe-empleados-edit': 'jefe-empleados',
     'jefe-tecnicos-create': 'jefe-tecnicos',
+    'jefe-tecnicos-edit': 'jefe-tecnicos',
+    'jefe-incidencias-edit': 'jefe-incidencias',
+    'emp-edit': 'emp-mis',
     'tec-gestionar': 'tec-asignadas',
   }
   return map[view] || view
 }
 
 function renderView(view, role, onNavigate, ctx) {
-  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, loadAll } = ctx
+  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, notifications } = ctx
   if (role === 'admin') {
     if (view === 'admin-dashboard') return <AdminDashboard stats={data.statsSystem} incidents={data.incidents} />
     if (view === 'admin-empresas') return <EmpresasList data={data.companies} onCreate={() => onNavigate('admin-empresas-create')} />
     if (view === 'admin-empresas-create') return <CrearEmpresa onBack={() => onNavigate('admin-empresas')} onCreate={async (payload) => { await apiFetch('/companies', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); }} />
-    if (view === 'admin-jefes') return <JefesList users={data.users} onCreate={() => onNavigate('admin-jefes-create')} />
+    if (view === 'admin-jefes') return <JefesList
+      users={data.users}
+      onCreate={() => onNavigate('admin-jefes-create')}
+      onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-jefes'); onNavigate('admin-user-edit'); }}
+      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+    />
     if (view === 'admin-jefes-create') return <CrearJefe companies={data.companies} onBack={() => onNavigate('admin-jefes')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-jefes'); }} />
-    if (view === 'admin-admins') return <AdminsList users={data.users} onCreate={() => onNavigate('admin-admins-create')} />
+    if (view === 'admin-admins') return <AdminsList
+      users={data.users}
+      onCreate={() => onNavigate('admin-admins-create')}
+      onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-admins'); onNavigate('admin-user-edit'); }}
+      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+    />
     if (view === 'admin-admins-create') return <CrearAdmin onBack={() => onNavigate('admin-admins')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-admins'); }} />
-    if (view === 'admin-supervisores') return <SupervisoresList users={data.users} onCreate={() => onNavigate('admin-supervisores-create')} />
+    if (view === 'admin-supervisores') return <SupervisoresList
+      users={data.users}
+      onCreate={() => onNavigate('admin-supervisores-create')}
+      onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-supervisores'); onNavigate('admin-user-edit'); }}
+      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+    />
+    if (view === 'admin-user-edit') return <EditarUsuario
+      user={selectedUser}
+      onBack={() => onNavigate(selectedUserSource || 'admin-jefes')}
+      onSave={async (payload) => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); }}
+    />
     if (view === 'admin-supervisores-create') return <CrearSupervisor onBack={() => onNavigate('admin-supervisores')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-supervisores'); }} />
     if (view === 'admin-estadisticas') return <EstadisticasSistema byCompany={data.byCompany} />
   }
@@ -307,23 +412,51 @@ function renderView(view, role, onNavigate, ctx) {
   }
   if (role === 'jefe_empresa') {
     if (view === 'jefe-dashboard') return <JefeDashboard stats={data.statsCompany} incidents={data.incidents} />
-    if (view === 'jefe-empleados') return <EmpleadosList users={data.users} onCreate={() => onNavigate('jefe-empleados-create')} />
+    if (view === 'jefe-empleados') return <EmpleadosList
+      users={data.users}
+      onCreate={() => onNavigate('jefe-empleados-create')}
+      onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-empleados-edit'); }}
+      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+    />
     if (view === 'jefe-empleados-create') return <CrearEmpleado onBack={() => onNavigate('jefe-empleados')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }} />
-    if (view === 'jefe-tecnicos') return <TecnicosList users={data.users} onCreate={() => onNavigate('jefe-tecnicos-create')} />
+    if (view === 'jefe-empleados-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={async (payload) => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }} />
+    if (view === 'jefe-tecnicos') return <TecnicosList
+      users={data.users}
+      onCreate={() => onNavigate('jefe-tecnicos-create')}
+      onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-tecnicos-edit'); }}
+      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+    />
     if (view === 'jefe-tecnicos-create') return <CrearTecnico onBack={() => onNavigate('jefe-tecnicos')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }} />
-    if (view === 'jefe-incidencias') return <IncidenciasList incidents={data.incidents} onManage={(id) => { setSelectedIncidentId(id); onNavigate('tec-gestionar'); }} />
+    if (view === 'jefe-tecnicos-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={async (payload) => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }} />
+    if (view === 'jefe-incidencias') return <IncidenciasList
+      incidents={data.incidents}
+      onManage={(id) => { setSelectedIncidentId(id); onNavigate('tec-gestionar'); }}
+      onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit'); }}
+      onDelete={async (id) => { if (!confirm('¿Eliminar incidencia?')) return; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }}
+    />
+    if (view === 'jefe-incidencias-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={async (payload) => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); }} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
     if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={async (payload) => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); }} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
-    if (view === 'emp-mis') return <MisIncidencias incidents={data.incidents} onCreate={() => onNavigate('emp-crear')} />
-    if (view === 'emp-crear') return <CrearIncidencia onCreate={async (payload) => { await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); }} />
+    if (view === 'emp-mis') return <MisIncidencias incidents={data.incidents} onCreate={() => onNavigate('emp-crear')} onEdit={(id) => { setSelectedIncidentId(id); onNavigate('emp-edit'); }} />
+    if (view === 'emp-crear') return <CrearIncidencia settings={data.settings} onCreate={async (payload, file) => {
+      const created = await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) })
+      if (file && created?.incident?.id) {
+        const formData = new FormData()
+        formData.append('file', file)
+        await apiFetch(`/incidents/${created.incident.id}/attachments`, { method: 'POST', body: formData })
+      }
+      await loadAll()
+      onNavigate('emp-mis')
+    }} />
+    if (view === 'emp-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={async (payload) => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); }} />
   }
   if (role === 'tecnico') {
     if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} />
     if (view === 'tec-asignadas') return <IncidenciasAsignadas incidents={data.incidents} onManage={(id) => { setSelectedIncidentId(id); onNavigate('tec-gestionar'); }} />
-    if (view === 'tec-gestionar') return <GestionarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} apiFetch={apiFetch} onUpdated={loadAll} />
+    if (view === 'tec-gestionar') return <GestionarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} apiFetch={apiFetch} onUpdated={loadAll} notifications={notifications} />
   }
   return <div className="panel">Vista no disponible</div>
 }
@@ -454,11 +587,10 @@ function JefeDashboard({ stats, incidents }) {
 }
 
 function EmpleadoDashboard({ incidents }) {
-  const own = incidents
   const cards = [
-    { label: 'Mis abiertas', value: own.filter((i) => i.status?.name === 'abierta').length, icon: '•', color: 'gray' },
-    { label: 'En proceso', value: own.filter((i) => i.status?.name === 'en_progreso').length, icon: '🕒', color: 'blue' },
-    { label: 'Resueltas', value: own.filter((i) => i.status?.name === 'resuelta').length, icon: '✔', color: 'green' },
+    { label: 'Mis abiertas', value: incidents.filter((i) => i.status?.name === 'abierta').length, icon: '•', color: 'gray' },
+    { label: 'En proceso', value: incidents.filter((i) => i.status?.name === 'en_progreso').length, icon: '🕒', color: 'blue' },
+    { label: 'Resueltas', value: incidents.filter((i) => i.status?.name === 'resuelta').length, icon: '✔', color: 'green' },
   ]
   const rows = incidents.slice(0, 4).map((i) => ({
     title: i.title,
@@ -548,7 +680,7 @@ function EmpresasList({ data, readonly, onCreate }) {
   )
 }
 
-function JefesList({ users, onCreate }) {
+function JefesList({ users, onCreate, onEdit, onDelete }) {
   const rows = users.filter((u) => u.role?.name === 'jefe_empresa')
   return (
     <div className="panel">
@@ -577,12 +709,13 @@ function JefesList({ users, onCreate }) {
               <td>{r.name}</td>
               <td>{r.last_name}</td>
               <td>{r.email}</td>
-              <td>{r.company?.name || '-'}</td>
+              <td>{r.company?.name || '-'}
+              </td>
               <td>{r.phone || '-'}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn">✏️</button>
-                <button className="icon-btn">🗑️</button>
+                <button className="icon-btn" onClick={() => onEdit(r)}>✏️</button>
+                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -593,7 +726,7 @@ function JefesList({ users, onCreate }) {
   )
 }
 
-function AdminsList({ users, onCreate }) {
+function AdminsList({ users, onCreate, onEdit, onDelete }) {
   const rows = users.filter((u) => u.role?.name === 'admin')
   return (
     <div className="panel">
@@ -622,8 +755,8 @@ function AdminsList({ users, onCreate }) {
               <td>{r.email}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn">✏️</button>
-                <button className="icon-btn">🗑️</button>
+                <button className="icon-btn" onClick={() => onEdit?.(r)}>✏️</button>
+                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -634,7 +767,7 @@ function AdminsList({ users, onCreate }) {
   )
 }
 
-function SupervisoresList({ users, onCreate }) {
+function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
   const rows = users.filter((u) => u.role?.name === 'supervisor')
   return (
     <div className="panel">
@@ -663,8 +796,8 @@ function SupervisoresList({ users, onCreate }) {
               <td>{r.email}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn">✏️</button>
-                <button className="icon-btn">🗑️</button>
+                <button className="icon-btn" onClick={() => onEdit?.(r)}>✏️</button>
+                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -675,7 +808,7 @@ function SupervisoresList({ users, onCreate }) {
   )
 }
 
-function EmpleadosList({ users, onCreate }) {
+function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
   const rows = users.filter((u) => u.role?.name === 'empleado')
   return (
     <div className="panel">
@@ -706,8 +839,8 @@ function EmpleadosList({ users, onCreate }) {
               <td>{r.department || '-'}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn">✏️</button>
-                <button className="icon-btn">🗑️</button>
+                <button className="icon-btn" onClick={() => onEdit(r)}>✏️</button>
+                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -718,7 +851,7 @@ function EmpleadosList({ users, onCreate }) {
   )
 }
 
-function TecnicosList({ users, onCreate }) {
+function TecnicosList({ users, onCreate, onEdit, onDelete }) {
   const rows = users.filter((u) => u.role?.name === 'tecnico')
   return (
     <div className="panel">
@@ -749,8 +882,8 @@ function TecnicosList({ users, onCreate }) {
               <td>{r.specialty || '-'}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn">✏️</button>
-                <button className="icon-btn">🗑️</button>
+                <button className="icon-btn" onClick={() => onEdit(r)}>✏️</button>
+                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -761,7 +894,7 @@ function TecnicosList({ users, onCreate }) {
   )
 }
 
-function IncidenciasList({ incidents, onManage }) {
+function IncidenciasList({ incidents, onManage, onEdit, onDelete }) {
   return (
     <div className="panel">
       <div className="panel__header">
@@ -792,7 +925,8 @@ function IncidenciasList({ incidents, onManage }) {
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onManage(i.id)}>✏️</button>
+                <button className="icon-btn" onClick={() => onEdit(i.id)}>✏️</button>
+                {onDelete && <button className="icon-btn" onClick={() => onDelete(i.id)}>🗑️</button>}
               </td>
             </tr>
           ))}
@@ -803,7 +937,7 @@ function IncidenciasList({ incidents, onManage }) {
   )
 }
 
-function MisIncidencias({ incidents, onCreate }) {
+function MisIncidencias({ incidents, onCreate, onEdit }) {
   return (
     <div className="panel">
       <div className="panel__header">
@@ -833,7 +967,7 @@ function MisIncidencias({ incidents, onCreate }) {
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
-                <button className="icon-btn">✏️</button>
+                <button className="icon-btn" onClick={() => onEdit(i.id)}>✏️</button>
               </td>
             </tr>
           ))}
@@ -885,8 +1019,10 @@ function IncidenciasAsignadas({ incidents, onManage }) {
   )
 }
 
-function CrearIncidencia({ onCreate }) {
+function CrearIncidencia({ onCreate, settings }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
+  const [file, setFile] = useState(null)
+  const categories = settings?.categories || []
   return (
     <div className="panel form">
       <h3>Crear incidencia</h3>
@@ -895,7 +1031,51 @@ function CrearIncidencia({ onCreate }) {
       <label>Descripción</label>
       <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalla el problema con toda la información posible..." />
       <label>Categoría</label>
-      <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Redes, Software..." />
+      {categories.length > 0 ? (
+        <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+          <option value="">Seleccionar...</option>
+          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      ) : (
+        <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Redes, Software..." />
+      )}
+      <label>Prioridad</label>
+      <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+        {PRIORITY_OPTIONS.map((p) => (
+          <option key={p.value} value={p.value}>{p.label}</option>
+        ))}
+      </select>
+      <label>Adjuntar archivo (opcional)</label>
+      <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      <button className="btn btn--primary" onClick={() => onCreate(form, file)}>Crear incidencia</button>
+    </div>
+  )
+}
+
+function EditarIncidencia({ incident, onBack, onSave }) {
+  const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
+  useEffect(() => {
+    if (incident) {
+      setForm({
+        title: incident.title || '',
+        description: incident.description || '',
+        category: incident.category || '',
+        priority: incident.priority || 'medium',
+      })
+    }
+  }, [incident])
+
+  if (!incident) return <div className="panel">Selecciona una incidencia</div>
+
+  return (
+    <div className="panel form">
+      <FormHeader title="Editar incidencia" onBack={onBack} />
+      <label>Título</label>
+      <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+      <label>Descripción</label>
+      <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+      <label>Categoría</label>
+      <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
       <label>Prioridad</label>
       <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
         <option value="low">Baja</option>
@@ -903,13 +1083,52 @@ function CrearIncidencia({ onCreate }) {
         <option value="high">Alta</option>
         <option value="urgent">Crítica</option>
       </select>
-      <button className="btn btn--primary" onClick={() => onCreate(form)}>Crear incidencia</button>
+      <button className="btn btn--primary" onClick={() => onSave(form)}>Guardar cambios</button>
+    </div>
+  )
+}
+
+function EditarUsuario({ user, onBack, onSave }) {
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '' })
+  useEffect(() => {
+    if (user) {
+      setForm({
+        name: user.name || '',
+        last_name: user.last_name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        department: user.department || '',
+        specialty: user.specialty || '',
+      })
+    }
+  }, [user])
+  if (!user) return <div className="panel">Selecciona un usuario</div>
+  return (
+    <div className="panel form">
+      <FormHeader title="Editar usuario" onBack={onBack} />
+      <label>Nombre</label>
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <label>Apellidos</label>
+      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label>Email</label>
+      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <label>Teléfono</label>
+      <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <label>Departamento</label>
+      <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
+      <label>Especialidad</label>
+      <input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
+      <button className="btn btn--primary" onClick={() => onSave(form)}>Guardar cambios</button>
     </div>
   )
 }
 
 function GestionarIncidencia({ incident, apiFetch, onUpdated }) {
   const [status, setStatus] = useState('open')
+  const [comment, setComment] = useState('')
+  const [comments, setComments] = useState([])
+  const [attachments, setAttachments] = useState([])
+  const [uploadFile, setUploadFile] = useState(null)
 
   useEffect(() => {
     if (incident?.status?.name) {
@@ -917,11 +1136,40 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated }) {
     }
   }, [incident])
 
+  useEffect(() => {
+    const load = async () => {
+      if (!incident) return
+      const c = await apiFetch(`/incidents/${incident.id}/comments`)
+      setComments(c.comments || [])
+      const a = await apiFetch(`/incidents/${incident.id}/attachments`)
+      setAttachments(a.attachments || [])
+    }
+    load()
+  }, [incident])
+
   if (!incident) return <div className="panel">Selecciona una incidencia</div>
 
   const updateStatus = async () => {
     await apiFetch(`/incidents/${incident.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
     await onUpdated()
+  }
+
+  const addComment = async () => {
+    if (!comment.trim()) return
+    await apiFetch(`/incidents/${incident.id}/comments`, { method: 'POST', body: JSON.stringify({ comment }) })
+    setComment('')
+    const c = await apiFetch(`/incidents/${incident.id}/comments`)
+    setComments(c.comments || [])
+  }
+
+  const uploadAttachment = async () => {
+    if (!uploadFile) return
+    const formData = new FormData()
+    formData.append('file', uploadFile)
+    await apiFetch(`/incidents/${incident.id}/attachments`, { method: 'POST', body: formData })
+    setUploadFile(null)
+    const a = await apiFetch(`/incidents/${incident.id}/attachments`)
+    setAttachments(a.attachments || [])
   }
 
   return (
@@ -961,6 +1209,34 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated }) {
           <option value="closed">Cerrada</option>
         </select>
         <button className="btn btn--success" onClick={updateStatus}>Guardar estado</button>
+        <div className="panel__title">Adjuntos</div>
+        <ul className="file-list">
+          {attachments.map((a) => (
+            <li key={a.id}>
+              <a href={`${API_ROOT}/storage/${a.file_path}`} target="_blank" rel="noreferrer">{a.file_path}</a>
+            </li>
+          ))}
+        </ul>
+        <div className="upload-row">
+          <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+          <button className="btn btn--primary" onClick={uploadAttachment}>Subir</button>
+        </div>
+      </div>
+      <div className="panel">
+        <div className="panel__title">Historial de comentarios ({comments.length})</div>
+        {comments.map((c) => (
+          <div key={c.id} className="comment">
+            <div className="avatar">{c.user?.name?.[0] || 'U'}</div>
+            <div>
+              <div className="comment__meta">{c.user?.name} · {formatDate(c.created_at)}</div>
+              <div>{c.comment}</div>
+            </div>
+          </div>
+        ))}
+        <div className="comment__input">
+          <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Escribe un comentario..." />
+          <button className="btn btn--primary" onClick={addComment}>Enviar</button>
+        </div>
       </div>
       <div className="panel">
         <div className="panel__title">Detalles</div>

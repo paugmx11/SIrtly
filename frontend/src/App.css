@@ -138,29 +138,128 @@
   gap: 18px;
 }
 
-.bell {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #e2e8f0;
+.notifications {
   position: relative;
 }
 
-.bell::after {
-  content: '';
-  width: 8px;
-  height: 8px;
+.bell {
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: #ef4444;
+  background: #e2e8f0;
+  position: relative;
+  border: none;
+  cursor: pointer;
+}
+
+.badge {
   position: absolute;
-  right: -2px;
-  top: -2px;
+  top: -6px;
+  right: -6px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.notifications__panel {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  width: 320px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  z-index: 10;
+}
+
+.notifications__panel ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.notifications__panel li {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.notifications__panel li.unread {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.notifications__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+
+.notif-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.notif-body {
+  font-size: 13px;
+  color: #475569;
+}
+
+.notif-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
 }
 
 .profile {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.file-list a {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.file-list a:hover {
+  text-decoration: underline;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .main {
