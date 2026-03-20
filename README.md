@@ -1,225 +1,170 @@
-# Sirtly — Sistema de Gestión de Incidencias Multiempresa
+# Sirtly - Multi-Company Incident Management System
 
-**Stack**
-- Backend: PHP (Laravel) — API REST
-- Frontend: JavaScript (React)
-- Base de datos: MySQL
-- Cliente DB recomendado: DBeaver
+## Project Repository
+- GitHub repository: `git@github.com:paugmx11/SIrtly.git`
+- Public repository URL: `https://github.com/paugmx11/SIrtly`
 
-## Roles del sistema
-- `admin` (interno): crea empresas, jefes de empresa, supervisores y otros admins.
-- `supervisor` (interno): consulta global, sin modificar datos.
-- `jefe_empresa`: gestiona usuarios de su empresa y ve incidencias de su empresa.
-- `tecnico`: gestiona incidencias de su empresa (cambia estados, comentarios).
-- `empleado`: crea incidencias y ve el estado de las suyas.
+## Stack
+- Backend: PHP, Laravel, REST API
+- Frontend: JavaScript, React, Vite
+- Database: MySQL
+- Authentication: Laravel Sanctum
+- Recommended DB client: DBeaver
 
-## Flujo de creación de usuarios
-- Primer `admin`: se crea manualmente en base de datos.
-- `admin`: crea empresas, jefes de empresa, supervisores y admins.
-- `jefe_empresa`: crea técnicos y empleados de su empresa.
+## Backend Architecture
+The backend is implemented in Laravel using Eloquent ORM as the data access layer.
 
-## Endpoints principales (API)
+Eloquent follows the Active Record pattern, where each model represents a database table and exposes CRUD operations directly from PHP without writing raw SQL for the application logic.
+
+This was chosen because:
+- it is built into Laravel with no extra integration layer
+- it speeds up development with less boilerplate
+- it makes entity relationships easier to define and maintain
+- it keeps the API code more readable and consistent
+
+The system is built around Eloquent models such as:
+- `User`
+- `Company`
+- `CompanySetting`
+- `Role`
+- `Incident`
+- `Comment`
+- `IncidentAttachment`
+- `IncidentStatus`
+- `IncidentStatusHistory`
+- `Notification`
+
+Key Eloquent relationships currently implemented:
+- `Company -> users`
+- `Company -> incidents`
+- `Company -> settings`
+- `User -> company`
+- `User -> role`
+- `User -> createdIncidents`
+- `User -> assignedIncidents`
+- `User -> comments`
+- `User -> notifications`
+- `Role -> users`
+- `Incident -> company`
+- `Incident -> creator`
+- `Incident -> assignee`
+- `Incident -> status`
+- `Incident -> comments`
+- `Incident -> attachments`
+- `Incident -> statusHistory`
+- `Comment -> incident`
+- `Comment -> user`
+- `CompanySetting -> company`
+- `IncidentAttachment -> incident`
+- `IncidentAttachment -> uploader`
+- `IncidentStatusHistory -> incident`
+- `IncidentStatusHistory -> status`
+- `IncidentStatusHistory -> user`
+- `Notification -> user`
+
+## Versions
+- PHP: `^8.2`
+- Laravel: `^12.0`
+- Laravel Sanctum: `^4.3`
+- React: `^19.2.0`
+- React DOM: `^19.2.0`
+- Vite: `^7.3.1`
+- ESLint: `^9.39.1`
+- MySQL: project schema targets MySQL 8.x compatible syntax
+
+## Roles
+- `admin`: internal platform administrator. Can create companies, company managers, supervisors, and other admins.
+- `supervisor`: read-only access to global company and incident data.
+- `jefe_empresa`: manages users, incidents, and company settings inside one company.
+- `tecnico`: works on assigned incidents, updates status, adds comments, uploads attachments.
+- `empleado`: creates incidents and tracks their own incidents.
+
+## User Creation Flow
+- The first `admin` is inserted manually in the database.
+- An `admin` can create:
+  - companies
+  - `admin`
+  - `supervisor`
+  - `jefe_empresa`
+- A `jefe_empresa` can create:
+  - `tecnico`
+  - `empleado`
+
+There is no public registration flow.
+
+## Login Flow
+- Single login form for every role.
+- Endpoint: `POST /api/auth/login`
+- The backend returns the authenticated user and their role.
+- The frontend uses that role to load the correct dashboard automatically.
+
+## Main API Endpoints
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
-- `POST /api/auth/registerCompany` (requiere `admin` autenticado)
-- `POST /api/auth/registerUser` (requiere `admin` o `jefe_empresa`)
-- `GET /api/companies` (admin/supervisor)
-- `POST /api/companies` (admin)
-- `PUT /api/companies/{id}` (admin)
-- `GET /api/users` (admin/jefe_empresa)
-- `POST /api/users` (admin/jefe_empresa)
-- `PUT /api/users/{id}` (admin/jefe_empresa)
-- `DELETE /api/users/{id}` (admin/jefe_empresa)
+- `POST /api/auth/registerCompany`
+- `POST /api/auth/registerUser`
+- `GET /api/companies`
+- `POST /api/companies`
+- `PUT /api/companies/{id}`
+- `GET /api/users`
+- `POST /api/users`
+- `PUT /api/users/{id}`
+- `DELETE /api/users/{id}`
 - `GET /api/incidents`
 - `GET /api/incidents/{id}`
-- `POST /api/incidents` (solo `empleado`)
-- `PATCH /api/incidents/{id}/status` (solo `tecnico`)
-- `PATCH /api/incidents/{id}/assign` (tecnico o jefe_empresa)
+- `POST /api/incidents`
+- `PUT /api/incidents/{id}`
+- `DELETE /api/incidents/{id}`
+- `PATCH /api/incidents/{id}/status`
+- `PATCH /api/incidents/{id}/assign`
 - `GET /api/incidents/{id}/comments`
 - `POST /api/incidents/{id}/comments`
 - `GET /api/incidents/{id}/attachments`
 - `POST /api/incidents/{id}/attachments`
 - `GET /api/company-settings`
 - `PUT /api/company-settings`
-- `GET /api/stats/system` (admin/supervisor)
-- `GET /api/stats/company` (jefe_empresa)
-- `GET /api/stats/by-company` (admin/supervisor)
-- `GET /api/stats/by-technician` (jefe_empresa)
+- `GET /api/stats/system`
+- `GET /api/stats/company`
+- `GET /api/stats/by-company`
+- `GET /api/stats/by-technician`
 - `GET /api/notifications`
 - `POST /api/notifications/{id}/read`
 - `POST /api/notifications/read-all`
 
-## Frontend
-El frontend consume la API real (no hay datos mock). El rol del usuario se determina desde el backend en el login.
+## Current Frontend Status
+- Real login against the Laravel API.
+- Dashboards by role.
+- CRUD available for users from admin and company manager screens.
+- Company creation and company editing from admin screens.
+- Incident creation, editing, deletion, status updates, assignment, comments, and attachments.
+- Employees can edit their own incidents.
+- Notifications panel with unread state.
+- Company settings screen connected to the API.
+- Frontend forms validate required fields before sending requests.
+- Backend validation also enforces email, password, phone, CIF, and required field rules.
 
-## Base de datos (MySQL)
-Usa el archivo `.sql` en la raíz. Esquema actualizado:
+## Database
+The project uses the root `.sql` file as the source of truth.
 
-```sql
-CREATE DATABASE IF NOT EXISTS sirtly_db;
-USE sirtly_db;
+Main tables:
+- `companies`
+- `company_settings`
+- `roles`
+- `users`
+- `personal_access_tokens`
+- `incident_status`
+- `incidents`
+- `incident_status_history`
+- `incident_comments`
+- `incident_attachments`
+- `notifications`
 
--- EMPRESAS
-CREATE TABLE companies (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   name VARCHAR(150) NOT NULL,
-   cif VARCHAR(50),
-   email VARCHAR(150) UNIQUE,
-   phone VARCHAR(30),
-   address VARCHAR(255),
-   status ENUM('active','inactive') DEFAULT 'active',
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+The root `.sql` file already includes demo seed data.
 
--- PERSONALIZACIÓN DE EMPRESA
-CREATE TABLE company_settings (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   company_id INT UNIQUE,
-   primary_color VARCHAR(20),
-   secondary_color VARCHAR(20),
-   logo VARCHAR(255),
-   system_name VARCHAR(150),
-   favicon VARCHAR(255),
-   assignment_mode ENUM('manual','auto','specialty') DEFAULT 'manual',
-   categories JSON,
-   priorities JSON,
-   departments JSON,
-   specialties JSON,
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP NULL,
-   FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
-);
+## Environment
+Example `backend/.env` values:
 
--- ROLES
-CREATE TABLE roles (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   name VARCHAR(50) NOT NULL
-);
-INSERT INTO roles (name) VALUES
-('admin'),
-('supervisor'),
-('jefe_empresa'),
-('tecnico'),
-('empleado');
-
--- USUARIOS
-CREATE TABLE users (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   company_id INT NULL,
-   role_id INT NOT NULL,
-   name VARCHAR(120) NOT NULL,
-   last_name VARCHAR(120),
-   email VARCHAR(150) UNIQUE NOT NULL,
-   password VARCHAR(255) NOT NULL,
-   phone VARCHAR(30),
-   department VARCHAR(120),
-   specialty VARCHAR(120),
-   active BOOLEAN DEFAULT TRUE,
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
-   FOREIGN KEY (role_id) REFERENCES roles(id)
-);
-
--- TOKENS (Laravel Sanctum)
-CREATE TABLE personal_access_tokens (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   tokenable_type VARCHAR(255) NOT NULL,
-   tokenable_id INT NOT NULL,
-   name VARCHAR(255) NOT NULL,
-   token VARCHAR(64) NOT NULL UNIQUE,
-   abilities TEXT,
-   last_used_at TIMESTAMP NULL,
-   expires_at TIMESTAMP NULL,
-   created_at TIMESTAMP NULL,
-   updated_at TIMESTAMP NULL,
-   INDEX tokenable_index (tokenable_type, tokenable_id)
-);
-
--- ESTADOS DE INCIDENCIA
-CREATE TABLE incident_status (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   name VARCHAR(50) NOT NULL
-);
-INSERT INTO incident_status (name) VALUES
-('abierta'),
-('en_progreso'),
-('resuelta'),
-('cerrada');
-
--- INCIDENCIAS
-CREATE TABLE incidents (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   company_id INT NOT NULL,
-   created_by INT NOT NULL,
-   assigned_to INT,
-   status_id INT NOT NULL,
-   title VARCHAR(200) NOT NULL,
-   description TEXT,
-   category VARCHAR(120),
-   priority ENUM('low','medium','high','urgent') DEFAULT 'medium',
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP NULL,
-   FOREIGN KEY (company_id) REFERENCES companies(id),
-   FOREIGN KEY (created_by) REFERENCES users(id),
-   FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL,
-   FOREIGN KEY (status_id) REFERENCES incident_status(id)
-);
-
--- HISTORIAL DE ESTADOS
-CREATE TABLE incident_status_history (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   incident_id INT NOT NULL,
-   status_id INT NOT NULL,
-   changed_by INT NOT NULL,
-   changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   FOREIGN KEY (incident_id) REFERENCES incidents(id),
-   FOREIGN KEY (status_id) REFERENCES incident_status(id),
-   FOREIGN KEY (changed_by) REFERENCES users(id)
-);
-
--- COMENTARIOS
-CREATE TABLE incident_comments (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   incident_id INT NOT NULL,
-   user_id INT NOT NULL,
-   comment TEXT NOT NULL,
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   FOREIGN KEY (incident_id) REFERENCES incidents(id),
-   FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- ARCHIVOS ADJUNTOS
-CREATE TABLE incident_attachments (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   incident_id INT NOT NULL,
-   file_path VARCHAR(255) NOT NULL,
-   uploaded_by INT,
-   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   FOREIGN KEY (incident_id) REFERENCES incidents(id),
-   FOREIGN KEY (uploaded_by) REFERENCES users(id)
-);
-
--- NOTIFICACIONES
-CREATE TABLE notifications (
-   id INT AUTO_INCREMENT PRIMARY KEY,
-   user_id INT NOT NULL,
-   type VARCHAR(50) NOT NULL,
-   title VARCHAR(150) NOT NULL,
-   body TEXT,
-   read_at TIMESTAMP NULL,
-   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- SEED DATA (demo)
--- Incluye roles, empresas, usuarios, incidencias, comentarios y adjuntos
--- Password demo para usuarios: asdqwe123
--- Puedes ejecutar el .sql completo o solo la sección de seed al final.
-```
-
-## Backend (Laravel API)
-**Configuración .env**
-```
+```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -230,49 +175,58 @@ DB_PASSWORD=asdqwe123
 SESSION_DRIVER=database
 ```
 
-**Instalación**
+## Local Setup
+Import the SQL schema and demo data first.
+
+Backend:
+
 ```bash
 cd backend
 composer install
 php artisan key:generate
 php artisan storage:link
-```
-
-**Arranque**
-```bash
 php artisan serve
 ```
 
-## Frontend (React)
+Frontend:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## Datos de demo
-El archivo `.sql` ahora incluye datos de ejemplo (usuarios, empresas, incidencias, comentarios, adjuntos, notificaciones).
-Usuario admin demo:
-- email: `admin@sistema.com`
-- password: `asdqwe123`
+## Demo Credentials
+- Email: `admin@sistema.com`
+- Password: `asdqwe123`
 
-## Notas importantes
-- El login es único para todos los roles.
-- Si usas `SESSION_DRIVER=database`, asegúrate de tener la tabla `sessions` creada.
-- Para pruebas, usa Postman con `Authorization: Bearer <token>`.
+## Notes
+- The frontend consumes live API data. There are no mock datasets in the current UI flow.
+- Form validation exists in both frontend and backend for core fields such as email, password, phone, CIF, and required fields.
+- File uploads use Laravel public storage, so `php artisan storage:link` is required.
+- Admin user creation, supervisor creation, company manager creation, employee creation, technician creation, company creation, company editing, and incident editing are aligned with the current UI and API rules.
 
-## Tablas de autenticación
-**`sessions`**
-Se usa cuando `SESSION_DRIVER=database`. Almacena las sesiones del middleware `web` (por ejemplo al entrar a `/`).
+## Feature Commit Traceability
+The project history is organized around functional milestones. Relevant commits currently available in the repository:
 
-**`personal_access_tokens`**
-La usa Laravel Sanctum para autenticación por token en la API. Cada login crea un token que se guarda aquí y se envía como `Authorization: Bearer <token>`.
+- `5cc70b3` - Initial project setup with Laravel backend and React frontend
+- `0c90e0c` - Backend aligned with SQL schema and role flow
+- `e489e33` - Initial project README
+- `da3b500` - Documentation for `sessions` and `personal_access_tokens`
+- `b673f4e` - Frontend aligned with database-driven flow and seeds
+- `c119d5b` - Laravel API routing bootstrap and Sanctum fix
+- `06411c8` - Incident flow UI, notifications, and attachments
 
-## Estructura del proyecto
-```
-sirtly
-├ backend
-├ frontend
-├ .sql
-└ README.md
-```
+## Suggested Issue Mapping
+If you need the repository to show explicit issue tracking, create GitHub issues associated with these functional blocks:
+
+- `Issue 1` - Initial project setup and repository structure
+- `Issue 2` - SQL schema design and role model alignment
+- `Issue 3` - Authentication with Laravel Sanctum
+- `Issue 4` - User and company management
+- `Issue 5` - Incident lifecycle implementation
+- `Issue 6` - Comments, attachments, and notifications
+- `Issue 7` - Frontend integration with real API data
+- `Issue 8` - Validation, documentation, and final review
+
+This environment does not have the GitHub CLI installed, so actual GitHub issues must be created directly in the repository web interface.

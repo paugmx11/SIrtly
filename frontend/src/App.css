@@ -549,7 +549,8 @@
   padding: 32px;
   border-radius: 18px;
   position: absolute;
-  right: 80px;
+  left: 50%;
+  transform: translateX(-50%);
   top: 140px;
   box-shadow: 0 20px 40px rgba(15,23,42,0.15);
 }
@@ -589,5 +590,5 @@
 @media (max-width: 1200px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .grid-2 { grid-template-columns: 1fr; }
-  .login__card { position: static; margin-top: 40px; width: auto; }
+  .login__card { position: static; margin-top: 40px; width: auto; transform: none; }
 }

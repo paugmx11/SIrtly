@@ -11,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    private const PHONE_REGEX = '/^\+?[0-9\s()\-]{7,20}$/';
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -39,7 +41,7 @@ class UserController extends Controller
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(['admin', 'supervisor', 'jefe_empresa', 'tecnico', 'empleado'])],
             'company_id' => ['nullable', 'integer', 'exists:companies,id'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30', 'regex:' . self::PHONE_REGEX],
             'department' => ['nullable', 'string', 'max:120'],
             'specialty' => ['nullable', 'string', 'max:120'],
             'active' => ['nullable', 'boolean'],
@@ -111,7 +113,7 @@ class UserController extends Controller
             'last_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'string', 'min:8'],
-            'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:' . self::PHONE_REGEX],
             'department' => ['sometimes', 'nullable', 'string', 'max:120'],
             'specialty' => ['sometimes', 'nullable', 'string', 'max:120'],
             'active' => ['sometimes', 'boolean'],

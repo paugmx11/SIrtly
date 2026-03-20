@@ -9,6 +9,9 @@ use Illuminate\Validation\Rule;
 
 class CompanyController extends Controller
 {
+    private const PHONE_REGEX = '/^\+?[0-9\s()\-]{7,20}$/';
+    private const CIF_REGEX = '/^[A-Za-z0-9\-]{5,20}$/';
+
     public function index(Request $request)
     {
         $role = $request->user()->role?->name;
@@ -30,9 +33,9 @@ class CompanyController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'cif' => ['nullable', 'string', 'max:50'],
+            'cif' => ['nullable', 'string', 'max:50', 'regex:' . self::CIF_REGEX],
             'email' => ['nullable', 'email', 'max:150', 'unique:companies,email'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30', 'regex:' . self::PHONE_REGEX],
             'address' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
@@ -60,9 +63,9 @@ class CompanyController extends Controller
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:150'],
-            'cif' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'cif' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:' . self::CIF_REGEX],
             'email' => ['sometimes', 'nullable', 'email', 'max:150', Rule::unique('companies', 'email')->ignore($company->id)],
-            'phone' => ['sometimes', 'nullable', 'string', 'max:30'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:' . self::PHONE_REGEX],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'status' => ['sometimes', Rule::in(['active', 'inactive'])],
         ]);

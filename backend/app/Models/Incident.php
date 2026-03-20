@@ -17,6 +17,7 @@ class Incident extends Model
         'status_id',
         'title',
         'description',
+        'category',
         'priority',
     ];
 
@@ -43,5 +44,15 @@ class Incident extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(Comment::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(IncidentAttachment::class);
+    }
+
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(IncidentStatusHistory::class);
     }
 }

@@ -181,7 +181,7 @@ ON DUPLICATE KEY UPDATE company_id=VALUES(company_id);
 -- Users (password: asdqwe123)
 INSERT INTO users (id, company_id, role_id, name, last_name, email, password, phone, department, specialty, active)
 VALUES
-(1, NULL, 1, 'Admin', 'Sistema', 'admin@sistema.com', '$2y$12$0m2XpvLxqkMFwlSmnySYd.rCEAPw8Gl/HP/26sw07Hjdlqvzl/xh2', NULL, NULL, NULL, 1),
+(1, NULL, 1, 'Admin', 'Sistema', 'admin@sistema.com', '$2y$12$sqKqs.Z7BtagBnPLMJwLFOdHtpG/gdse.gMWy1coRbSTQwmXUnlP.', NULL, NULL, NULL, 1),
 (2, NULL, 2, 'Roberto', 'Sánchez Vega', 'roberto@incidencias.app', '$2y$12$0m2XpvLxqkMFwlSmnySYd.rCEAPw8Gl/HP/26sw07Hjdlqvzl/xh2', NULL, NULL, NULL, 1),
 (3, NULL, 2, 'Elena', 'Morales Díaz', 'elena@incidencias.app', '$2y$12$0m2XpvLxqkMFwlSmnySYd.rCEAPw8Gl/HP/26sw07Hjdlqvzl/xh2', NULL, NULL, NULL, 1),
 (10, 1, 3, 'Carlos', 'Martínez López', 'carlos@techsolutions.es', '$2y$12$0m2XpvLxqkMFwlSmnySYd.rCEAPw8Gl/HP/26sw07Hjdlqvzl/xh2', '+34 612 345 678', NULL, NULL, 1),

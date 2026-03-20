@@ -246,6 +246,10 @@ class IncidentController extends Controller
             if ($incident->company_id !== $user->company_id) {
                 return response()->json(['message' => 'Not authorized.'], 403);
             }
+        } elseif ($roleName === 'empleado') {
+            if ($incident->created_by !== $user->id) {
+                return response()->json(['message' => 'Not authorized.'], 403);
+            }
         } else {
             return response()->json(['message' => 'Not authorized.'], 403);
         }

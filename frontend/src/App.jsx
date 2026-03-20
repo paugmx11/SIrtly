@@ -53,6 +53,8 @@ const TECNICO_MENU = [
 
 const API_BASE = 'http://127.0.0.1:8000/api'
 const API_ROOT = API_BASE.replace('/api', '')
+const PHONE_PATTERN = '^\\+?[0-9\\s()\\-]{7,20}$'
+const CIF_PATTERN = '^[A-Za-z0-9\\-]{5,20}$'
 
 function App() {
   const [token, setToken] = useState('')
@@ -62,6 +64,7 @@ function App() {
   const [selectedIncidentId, setSelectedIncidentId] = useState(null)
   const [selectedUser, setSelectedUser] = useState(null)
   const [selectedUserSource, setSelectedUserSource] = useState(null)
+  const [selectedCompany, setSelectedCompany] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
 
@@ -85,6 +88,14 @@ function App() {
     if (role === 'empleado') return EMPLEADO_MENU
     return TECNICO_MENU
   }, [role])
+
+  const runAction = async (action) => {
+    try {
+      await action()
+    } catch (error) {
+      alert(error.message || 'Ha ocurrido un error')
+    }
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -120,8 +131,20 @@ function App() {
         ...(options.headers || {}),
       },
     })
-    if (!res.ok) throw new Error('Request failed')
-    return res.json()
+    const text = await res.text()
+    let payload = null
+    try {
+      payload = text ? JSON.parse(text) : null
+    } catch {
+      payload = null
+    }
+
+    if (!res.ok) {
+      const firstFieldError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null
+      throw new Error(firstFieldError || payload?.message || 'Request failed')
+    }
+
+    return payload
   }
 
   const loadAll = async () => {
@@ -306,6 +329,8 @@ function App() {
             setSelectedUser,
             selectedUserSource,
             setSelectedUserSource,
+            selectedCompany,
+            setSelectedCompany,
             notifications,
             setNotifications,
           })}
@@ -320,6 +345,7 @@ function resolveTitle(view) {
     'admin-dashboard': 'Dashboard',
     'admin-empresas': 'Empresas',
     'admin-empresas-create': 'Crear empresa',
+    'admin-empresas-edit': 'Editar empresa',
     'admin-jefes': 'Jefes de empresa',
     'admin-jefes-create': 'Crear jefe de empresa',
     'admin-admins': 'Administradores',
@@ -356,6 +382,7 @@ function resolveTitle(view) {
 function resolveActiveKey(view, selectedUserSource) {
   const map = {
     'admin-empresas-create': 'admin-empresas',
+    'admin-empresas-edit': 'admin-empresas',
     'admin-jefes-create': 'admin-jefes',
     'admin-admins-create': 'admin-admins',
     'admin-supervisores-create': 'admin-supervisores',
@@ -372,37 +399,38 @@ function resolveActiveKey(view, selectedUserSource) {
 }
 
 function renderView(view, role, onNavigate, ctx) {
-  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, notifications } = ctx
+  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications } = ctx
   if (role === 'admin') {
     if (view === 'admin-dashboard') return <AdminDashboard stats={data.statsSystem} incidents={data.incidents} />
-    if (view === 'admin-empresas') return <EmpresasList data={data.companies} onCreate={() => onNavigate('admin-empresas-create')} />
-    if (view === 'admin-empresas-create') return <CrearEmpresa onBack={() => onNavigate('admin-empresas')} onCreate={async (payload) => { await apiFetch('/companies', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); }} />
+    if (view === 'admin-empresas') return <EmpresasList data={data.companies} onCreate={() => onNavigate('admin-empresas-create')} onEdit={(company) => { setSelectedCompany(company); onNavigate('admin-empresas-edit') }} />
+    if (view === 'admin-empresas-create') return <CrearEmpresa onBack={() => onNavigate('admin-empresas')} onCreate={(payload) => runAction(async () => { await apiFetch('/companies', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); })} />
+    if (view === 'admin-empresas-edit') return <EditarEmpresa company={selectedCompany} onBack={() => onNavigate('admin-empresas')} onSave={(payload) => runAction(async () => { await apiFetch(`/companies/${selectedCompany.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); })} />
     if (view === 'admin-jefes') return <JefesList
       users={data.users}
       onCreate={() => onNavigate('admin-jefes-create')}
       onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-jefes'); onNavigate('admin-user-edit'); }}
-      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
     />
-    if (view === 'admin-jefes-create') return <CrearJefe companies={data.companies} onBack={() => onNavigate('admin-jefes')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-jefes'); }} />
+    if (view === 'admin-jefes-create') return <CrearJefe companies={data.companies} onBack={() => onNavigate('admin-jefes')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-jefes'); })} />
     if (view === 'admin-admins') return <AdminsList
       users={data.users}
       onCreate={() => onNavigate('admin-admins-create')}
       onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-admins'); onNavigate('admin-user-edit'); }}
-      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
     />
-    if (view === 'admin-admins-create') return <CrearAdmin onBack={() => onNavigate('admin-admins')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-admins'); }} />
+    if (view === 'admin-admins-create') return <CrearAdmin onBack={() => onNavigate('admin-admins')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-admins'); })} />
     if (view === 'admin-supervisores') return <SupervisoresList
       users={data.users}
       onCreate={() => onNavigate('admin-supervisores-create')}
       onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-supervisores'); onNavigate('admin-user-edit'); }}
-      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
     />
     if (view === 'admin-user-edit') return <EditarUsuario
       user={selectedUser}
       onBack={() => onNavigate(selectedUserSource || 'admin-jefes')}
-      onSave={async (payload) => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); }}
+      onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); })}
     />
-    if (view === 'admin-supervisores-create') return <CrearSupervisor onBack={() => onNavigate('admin-supervisores')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-supervisores'); }} />
+    if (view === 'admin-supervisores-create') return <CrearSupervisor onBack={() => onNavigate('admin-supervisores')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-supervisores'); })} />
     if (view === 'admin-estadisticas') return <EstadisticasSistema byCompany={data.byCompany} />
   }
   if (role === 'supervisor') {
@@ -416,32 +444,32 @@ function renderView(view, role, onNavigate, ctx) {
       users={data.users}
       onCreate={() => onNavigate('jefe-empleados-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-empleados-edit'); }}
-      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
     />
-    if (view === 'jefe-empleados-create') return <CrearEmpleado onBack={() => onNavigate('jefe-empleados')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }} />
-    if (view === 'jefe-empleados-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={async (payload) => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }} />
+    if (view === 'jefe-empleados-create') return <CrearEmpleado onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
+    if (view === 'jefe-empleados-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
     if (view === 'jefe-tecnicos') return <TecnicosList
       users={data.users}
       onCreate={() => onNavigate('jefe-tecnicos-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-tecnicos-edit'); }}
-      onDelete={async (u) => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
     />
-    if (view === 'jefe-tecnicos-create') return <CrearTecnico onBack={() => onNavigate('jefe-tecnicos')} onCreate={async (payload) => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }} />
-    if (view === 'jefe-tecnicos-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={async (payload) => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }} />
+    if (view === 'jefe-tecnicos-create') return <CrearTecnico onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
+    if (view === 'jefe-tecnicos-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
     if (view === 'jefe-incidencias') return <IncidenciasList
       incidents={data.incidents}
       onManage={(id) => { setSelectedIncidentId(id); onNavigate('tec-gestionar'); }}
       onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit'); }}
-      onDelete={async (id) => { if (!confirm('¿Eliminar incidencia?')) return; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }}
+      onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); })}
     />
-    if (view === 'jefe-incidencias-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={async (payload) => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); }} />
+    if (view === 'jefe-incidencias-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
-    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={async (payload) => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); }} />
+    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); })} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
     if (view === 'emp-mis') return <MisIncidencias incidents={data.incidents} onCreate={() => onNavigate('emp-crear')} onEdit={(id) => { setSelectedIncidentId(id); onNavigate('emp-edit'); }} />
-    if (view === 'emp-crear') return <CrearIncidencia settings={data.settings} onCreate={async (payload, file) => {
+    if (view === 'emp-crear') return <CrearIncidencia settings={data.settings} onCreate={(payload, file) => runAction(async () => {
       const created = await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) })
       if (file && created?.incident?.id) {
         const formData = new FormData()
@@ -450,8 +478,8 @@ function renderView(view, role, onNavigate, ctx) {
       }
       await loadAll()
       onNavigate('emp-mis')
-    }} />
-    if (view === 'emp-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={async (payload) => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); }} />
+    })} />
+    if (view === 'emp-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
   }
   if (role === 'tecnico') {
     if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} />
@@ -634,7 +662,7 @@ function TecnicoDashboard({ incidents }) {
   )
 }
 
-function EmpresasList({ data, readonly, onCreate }) {
+function EmpresasList({ data, readonly, onCreate, onEdit }) {
   return (
     <div className="panel">
       <div className="panel__header">
@@ -667,7 +695,7 @@ function EmpresasList({ data, readonly, onCreate }) {
               <td><span className={`pill ${c.status === 'active' ? 'activa' : 'inactiva'}`}>{c.status === 'active' ? 'Activa' : 'Inactiva'}</span></td>
               {!readonly && (
                 <td className="actions">
-                  <button className="icon-btn">✏️</button>
+                  <button className="icon-btn" onClick={() => onEdit?.(c)}>✏️</button>
                   <button className="icon-btn">🗑️</button>
                 </td>
               )}
@@ -1023,6 +1051,14 @@ function CrearIncidencia({ onCreate, settings }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   const [file, setFile] = useState(null)
   const categories = settings?.categories || []
+  const submit = () => {
+    const error = validateIncidentForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate(form, file)
+  }
   return (
     <div className="panel form">
       <h3>Crear incidencia</h3>
@@ -1047,7 +1083,7 @@ function CrearIncidencia({ onCreate, settings }) {
       </select>
       <label>Adjuntar archivo (opcional)</label>
       <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-      <button className="btn btn--primary" onClick={() => onCreate(form, file)}>Crear incidencia</button>
+      <button className="btn btn--primary" onClick={submit}>Crear incidencia</button>
     </div>
   )
 }
@@ -1067,6 +1103,15 @@ function EditarIncidencia({ incident, onBack, onSave }) {
 
   if (!incident) return <div className="panel">Selecciona una incidencia</div>
 
+  const submit = () => {
+    const error = validateIncidentForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onSave(form)
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Editar incidencia" onBack={onBack} />
@@ -1083,13 +1128,13 @@ function EditarIncidencia({ incident, onBack, onSave }) {
         <option value="high">Alta</option>
         <option value="urgent">Crítica</option>
       </select>
-      <button className="btn btn--primary" onClick={() => onSave(form)}>Guardar cambios</button>
+      <button className="btn btn--primary" onClick={submit}>Guardar cambios</button>
     </div>
   )
 }
 
 function EditarUsuario({ user, onBack, onSave }) {
-  const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '' })
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '', password: '', active: true })
   useEffect(() => {
     if (user) {
       setForm({
@@ -1099,10 +1144,37 @@ function EditarUsuario({ user, onBack, onSave }) {
         phone: user.phone || '',
         department: user.department || '',
         specialty: user.specialty || '',
+        password: '',
+        active: user.active ?? true,
       })
     }
   }, [user])
   if (!user) return <div className="panel">Selecciona un usuario</div>
+
+  const submit = () => {
+    const error = validateUserForm(form, { passwordOptional: true })
+    if (error) {
+      alert(error)
+      return
+    }
+
+    const payload = {
+      name: form.name,
+      last_name: form.last_name,
+      email: form.email,
+      phone: form.phone,
+      department: form.department,
+      specialty: form.specialty,
+      active: form.active,
+    }
+
+    if (form.password.trim()) {
+      payload.password = form.password
+    }
+
+    onSave(payload)
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Editar usuario" onBack={onBack} />
@@ -1113,12 +1185,19 @@ function EditarUsuario({ user, onBack, onSave }) {
       <label>Email</label>
       <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       <label>Teléfono</label>
-      <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
       <label>Departamento</label>
       <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
       <label>Especialidad</label>
       <input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
-      <button className="btn btn--primary" onClick={() => onSave(form)}>Guardar cambios</button>
+      <label>Nueva contraseña (opcional)</label>
+      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <label>Estado</label>
+      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Guardar cambios</button>
     </div>
   )
 }
@@ -1365,6 +1444,36 @@ function ConfiguracionEmpresa({ settings, onSave }) {
   )
 }
 
+function sanitizePhone(value) {
+  return value.replace(/[^0-9+\s()-]/g, '')
+}
+
+function validateUserForm(form, options = {}) {
+  if (!form.name?.trim()) return 'El nombre es obligatorio'
+  if (!form.email?.trim()) return 'El email es obligatorio'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return 'El email no es valido'
+  if (!options.passwordOptional && !form.password?.trim()) return 'La contraseña es obligatoria'
+  if (form.password && form.password.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+  if (form.phone && !new RegExp(PHONE_PATTERN).test(form.phone)) return 'El teléfono no es valido'
+  if (options.requireCompany && !form.company_id) return 'Debes seleccionar una empresa'
+  return null
+}
+
+function validateCompanyForm(form) {
+  if (!form.name?.trim()) return 'El nombre de empresa es obligatorio'
+  if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return 'El email no es valido'
+  if (form.phone && !new RegExp(PHONE_PATTERN).test(form.phone)) return 'El teléfono no es valido'
+  if (form.cif && !new RegExp(CIF_PATTERN).test(form.cif)) return 'El CIF no es valido'
+  return null
+}
+
+function validateIncidentForm(form) {
+  if (!form.title?.trim()) return 'El título es obligatorio'
+  if (!form.description?.trim()) return 'La descripción es obligatoria'
+  if (form.title.trim().length > 255) return 'El título no puede superar 255 caracteres'
+  return null
+}
+
 function FormHeader({ title, onBack }) {
   return (
     <div className="form-header">
@@ -1376,119 +1485,263 @@ function FormHeader({ title, onBack }) {
 
 function CrearEmpresa({ onBack, onCreate }) {
   const [form, setForm] = useState({ name: '', cif: '', address: '', email: '', phone: '', status: 'active' })
+  const submit = () => {
+    const error = validateCompanyForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate(form)
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Crear empresa" onBack={onBack} />
       <label>Nombre de empresa</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       <label>CIF / Identificador</label>
-      <input value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value })} />
+      <input value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value.toUpperCase() })} pattern={CIF_PATTERN} />
       <label>Dirección</label>
       <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
       <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       <label>Teléfono</label>
-      <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      <button className="btn btn--primary" onClick={() => onCreate(form)}>Guardar empresa</button>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+        <option value="active">Activa</option>
+        <option value="inactive">Inactiva</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Guardar empresa</button>
+    </div>
+  )
+}
+
+function EditarEmpresa({ company, onBack, onSave }) {
+  const [form, setForm] = useState({ name: '', cif: '', address: '', email: '', phone: '', status: 'active' })
+
+  useEffect(() => {
+    if (company) {
+      setForm({
+        name: company.name || '',
+        cif: company.cif || '',
+        address: company.address || '',
+        email: company.email || '',
+        phone: company.phone || '',
+        status: company.status || 'active',
+      })
+    }
+  }, [company])
+
+  if (!company) return <div className="panel">Selecciona una empresa</div>
+
+  const submit = () => {
+    const error = validateCompanyForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onSave(form)
+  }
+
+  return (
+    <div className="panel form">
+      <FormHeader title="Editar empresa" onBack={onBack} />
+      <label>Nombre de empresa</label>
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label>CIF / Identificador</label>
+      <input value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value.toUpperCase() })} pattern={CIF_PATTERN} />
+      <label>Dirección</label>
+      <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+      <label>Email</label>
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <label>Teléfono</label>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+        <option value="active">Activa</option>
+        <option value="inactive">Inactiva</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Guardar cambios</button>
     </div>
   )
 }
 
 function CrearJefe({ onBack, onCreate, companies }) {
-  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', company_id: '' })
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', company_id: '', phone: '', active: true })
+  const submit = () => {
+    const error = validateUserForm(form, { requireCompany: true })
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate({ ...form, role: 'jefe_empresa' })
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Crear jefe de empresa" onBack={onBack} />
       <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       <label>Apellidos</label>
       <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
       <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
       <label>Empresa asignada</label>
       <select value={form.company_id} onChange={(e) => setForm({ ...form, company_id: Number(e.target.value) })}>
         <option value="">Seleccionar...</option>
         {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
-      <button className="btn btn--primary" onClick={() => onCreate({ ...form, role: 'jefe_empresa' })}>Crear jefe</button>
+      <label>Teléfono</label>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Crear jefe</button>
     </div>
   )
 }
 
 function CrearAdmin({ onBack, onCreate }) {
-  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '' })
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', phone: '', active: true })
+  const submit = () => {
+    const error = validateUserForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate({ ...form, role: 'admin' })
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Crear administrador" onBack={onBack} />
       <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       <label>Apellidos</label>
       <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
       <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      <button className="btn btn--primary" onClick={() => onCreate({ ...form, role: 'admin' })}>Crear administrador</button>
+      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label>Teléfono</label>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Crear administrador</button>
     </div>
   )
 }
 
 function CrearSupervisor({ onBack, onCreate }) {
-  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '' })
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', phone: '', active: true })
+  const submit = () => {
+    const error = validateUserForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate({ ...form, role: 'supervisor' })
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Crear supervisor" onBack={onBack} />
       <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       <label>Apellidos</label>
       <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
       <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      <button className="btn btn--primary" onClick={() => onCreate({ ...form, role: 'supervisor' })}>Crear supervisor</button>
+      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label>Teléfono</label>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Crear supervisor</button>
     </div>
   )
 }
 
 function CrearEmpleado({ onBack, onCreate }) {
-  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', department: '' })
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', department: '', phone: '', active: true })
+  const submit = () => {
+    const error = validateUserForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate({ ...form, role: 'empleado' })
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Crear empleado" onBack={onBack} />
       <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       <label>Apellidos</label>
       <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
       <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
       <label>Departamento (opcional)</label>
       <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
-      <button className="btn btn--primary" onClick={() => onCreate({ ...form, role: 'empleado' })}>Crear empleado</button>
+      <label>Teléfono</label>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Crear empleado</button>
     </div>
   )
 }
 
 function CrearTecnico({ onBack, onCreate }) {
-  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', specialty: '' })
+  const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', specialty: '', phone: '', active: true })
+  const submit = () => {
+    const error = validateUserForm(form)
+    if (error) {
+      alert(error)
+      return
+    }
+    onCreate({ ...form, role: 'tecnico' })
+  }
+
   return (
     <div className="panel form">
       <FormHeader title="Crear técnico" onBack={onBack} />
       <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
       <label>Apellidos</label>
       <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
       <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
       <label>Especialidad (opcional)</label>
       <input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
-      <button className="btn btn--primary" onClick={() => onCreate({ ...form, role: 'tecnico' })}>Crear técnico</button>
+      <label>Teléfono</label>
+      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label>Estado</label>
+      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+        <option value="1">Activo</option>
+        <option value="0">Inactivo</option>
+      </select>
+      <button className="btn btn--primary" onClick={submit}>Crear técnico</button>
     </div>
   )
 }
