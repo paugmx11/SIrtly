@@ -324,6 +324,7 @@ function App() {
             setSelectedIncidentId,
             selectedIncidentId,
             apiFetch,
+            runAction,
             loadAll,
             selectedUser,
             setSelectedUser,
@@ -399,7 +400,7 @@ function resolveActiveKey(view, selectedUserSource) {
 }
 
 function renderView(view, role, onNavigate, ctx) {
-  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications } = ctx
+  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, runAction, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications } = ctx
   if (role === 'admin') {
     if (view === 'admin-dashboard') return <AdminDashboard stats={data.statsSystem} incidents={data.incidents} />
     if (view === 'admin-empresas') return <EmpresasList data={data.companies} onCreate={() => onNavigate('admin-empresas-create')} onEdit={(company) => { setSelectedCompany(company); onNavigate('admin-empresas-edit') }} />
