@@ -146,6 +146,20 @@ There is no public registration flow.
 ## Database
 The project uses the root `.sql` file as the source of truth.
 
+Schema responsibility is split as follows:
+- `.sql` defines and creates the database structure
+- `.sql` also includes the demo seed data used by the project
+- Eloquent models do not create tables
+- Eloquent models are used to query, create, update, delete, and relate existing records
+- Laravel migrations exist in the repository, but they are not the canonical schema source for this project
+
+In practice, this means:
+- the MySQL schema should be created from the root `.sql` file
+- the backend application should use Eloquent models to work with that schema
+- `php artisan migrate` should not be used as the main way to build the project database, because it can diverge from the SQL schema
+
+This project keeps `.sql` as the authoritative schema definition and Eloquent as the ORM layer for application logic.
+
 Main tables:
 - `companies`
 - `company_settings`
