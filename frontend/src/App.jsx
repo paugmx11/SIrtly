@@ -48,7 +48,8 @@ const EMPLEADO_MENU = [
 
 const TECNICO_MENU = [
   { key: 'tec-dashboard', label: 'Dashboard', icon: 'grid' },
-  { key: 'tec-asignadas', label: 'Incidencias asignadas', icon: 'file' },
+  { key: 'tec-disponibles', label: 'Disponibles', icon: 'file' },
+  { key: 'tec-asignadas', label: 'Mis incidencias', icon: 'file' },
 ]
 
 const API_BASE = 'http://127.0.0.1:8000/api'
@@ -67,6 +68,7 @@ function App() {
   const [selectedCompany, setSelectedCompany] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [toasts, setToasts] = useState([])
 
   const [data, setData] = useState({
     companies: [],
@@ -89,11 +91,27 @@ function App() {
     return TECNICO_MENU
   }, [role])
 
-  const runAction = async (action) => {
+  const showToast = (type, message) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setToasts((prev) => [...prev, { id, type, message }])
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id))
+    }, 3600)
+  }
+
+  const notifySuccess = (message) => showToast('success', message)
+  const notifyError = (message) => showToast('error', message)
+
+  const runAction = async (action, options = {}) => {
     try {
-      await action()
+      const result = await action()
+      if (result !== false && options.successMessage) {
+        notifySuccess(options.successMessage)
+      }
+      return result
     } catch (error) {
-      alert(error.message || 'Ha ocurrido un error')
+      notifyError(options.errorMessage || error.message || 'Ha ocurrido un error')
+      return null
     }
   }
 
@@ -110,7 +128,7 @@ function App() {
     })
 
     if (!res.ok) {
-      alert('Credenciales inválidas')
+      notifyError('Credenciales inválidas')
       return
     }
 
@@ -118,6 +136,7 @@ function App() {
     setToken(payload.token)
     setUser(payload.user)
     setRole(payload.user?.role?.name || 'admin')
+    notifySuccess('Sesión iniciada correctamente')
   }
 
   const apiFetch = async (path, options = {}) => {
@@ -229,7 +248,7 @@ function App() {
       await apiFetch(`/notifications/${id}/read`, { method: 'POST' })
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)))
     } catch {
-      // ignore
+      notifyError('No se pudo marcar la notificación como leída')
     }
   }
 
@@ -237,8 +256,9 @@ function App() {
     try {
       await apiFetch('/notifications/read-all', { method: 'POST' })
       setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })))
+      notifySuccess('Notificaciones marcadas como leídas')
     } catch {
-      // ignore
+      notifyError('No se pudieron actualizar las notificaciones')
     }
   }
 
@@ -317,6 +337,7 @@ function App() {
             </div>
           </div>
         </header>
+        <ToastViewport toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />
 
         <main className="main">
           {renderView(view, role, setView, {
@@ -334,6 +355,9 @@ function App() {
             setSelectedCompany,
             notifications,
             setNotifications,
+            currentUser: user,
+            notifySuccess,
+            notifyError,
           })}
         </main>
       </div>
@@ -374,7 +398,8 @@ function resolveTitle(view) {
     'emp-crear': 'Crear incidencia',
     'emp-edit': 'Editar incidencia',
     'tec-dashboard': 'Dashboard',
-    'tec-asignadas': 'Incidencias asignadas',
+    'tec-disponibles': 'Incidencias disponibles',
+    'tec-asignadas': 'Mis incidencias',
     'tec-gestionar': 'Gestionar incidencia',
   }
   return titles[view] || 'Dashboard'
@@ -394,44 +419,45 @@ function resolveActiveKey(view, selectedUserSource) {
     'jefe-tecnicos-edit': 'jefe-tecnicos',
     'jefe-incidencias-edit': 'jefe-incidencias',
     'emp-edit': 'emp-mis',
-    'tec-gestionar': 'tec-asignadas',
+    'tec-gestionar': selectedUserSource || 'tec-asignadas',
   }
   return map[view] || view
 }
 
 function renderView(view, role, onNavigate, ctx) {
-  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, runAction, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications } = ctx
+  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, runAction, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications, currentUser, notifyError } = ctx
   if (role === 'admin') {
     if (view === 'admin-dashboard') return <AdminDashboard stats={data.statsSystem} incidents={data.incidents} />
     if (view === 'admin-empresas') return <EmpresasList data={data.companies} onCreate={() => onNavigate('admin-empresas-create')} onEdit={(company) => { setSelectedCompany(company); onNavigate('admin-empresas-edit') }} />
-    if (view === 'admin-empresas-create') return <CrearEmpresa onBack={() => onNavigate('admin-empresas')} onCreate={(payload) => runAction(async () => { await apiFetch('/companies', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); })} />
-    if (view === 'admin-empresas-edit') return <EditarEmpresa company={selectedCompany} onBack={() => onNavigate('admin-empresas')} onSave={(payload) => runAction(async () => { await apiFetch(`/companies/${selectedCompany.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); })} />
+    if (view === 'admin-empresas-create') return <CrearEmpresa notifyError={notifyError} onBack={() => onNavigate('admin-empresas')} onCreate={(payload) => runAction(async () => { await apiFetch('/companies', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); }, { successMessage: 'Empresa creada correctamente' })} />
+    if (view === 'admin-empresas-edit') return <EditarEmpresa notifyError={notifyError} company={selectedCompany} onBack={() => onNavigate('admin-empresas')} onSave={(payload) => runAction(async () => { await apiFetch(`/companies/${selectedCompany.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); }, { successMessage: 'Empresa actualizada correctamente' })} />
     if (view === 'admin-jefes') return <JefesList
       users={data.users}
       onCreate={() => onNavigate('admin-jefes-create')}
       onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-jefes'); onNavigate('admin-user-edit'); }}
-      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'admin-jefes-create') return <CrearJefe companies={data.companies} onBack={() => onNavigate('admin-jefes')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-jefes'); })} />
+    if (view === 'admin-jefes-create') return <CrearJefe notifyError={notifyError} companies={data.companies} onBack={() => onNavigate('admin-jefes')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-jefes'); }, { successMessage: 'Jefe de empresa creado correctamente' })} />
     if (view === 'admin-admins') return <AdminsList
       users={data.users}
       onCreate={() => onNavigate('admin-admins-create')}
       onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-admins'); onNavigate('admin-user-edit'); }}
-      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'admin-admins-create') return <CrearAdmin onBack={() => onNavigate('admin-admins')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-admins'); })} />
+    if (view === 'admin-admins-create') return <CrearAdmin notifyError={notifyError} onBack={() => onNavigate('admin-admins')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-admins'); }, { successMessage: 'Administrador creado correctamente' })} />
     if (view === 'admin-supervisores') return <SupervisoresList
       users={data.users}
       onCreate={() => onNavigate('admin-supervisores-create')}
       onEdit={(u) => { setSelectedUser(u); setSelectedUserSource('admin-supervisores'); onNavigate('admin-user-edit'); }}
-      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
     if (view === 'admin-user-edit') return <EditarUsuario
+      notifyError={notifyError}
       user={selectedUser}
       onBack={() => onNavigate(selectedUserSource || 'admin-jefes')}
-      onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); })}
+      onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); }, { successMessage: 'Usuario actualizado correctamente' })}
     />
-    if (view === 'admin-supervisores-create') return <CrearSupervisor onBack={() => onNavigate('admin-supervisores')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-supervisores'); })} />
+    if (view === 'admin-supervisores-create') return <CrearSupervisor notifyError={notifyError} onBack={() => onNavigate('admin-supervisores')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-supervisores'); }, { successMessage: 'Supervisor creado correctamente' })} />
     if (view === 'admin-estadisticas') return <EstadisticasSistema byCompany={data.byCompany} />
   }
   if (role === 'supervisor') {
@@ -445,32 +471,38 @@ function renderView(view, role, onNavigate, ctx) {
       users={data.users}
       onCreate={() => onNavigate('jefe-empleados-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-empleados-edit'); }}
-      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-empleados-create') return <CrearEmpleado onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
-    if (view === 'jefe-empleados-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
+    if (view === 'jefe-empleados-create') return <CrearEmpleado notifyError={notifyError} onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }, { successMessage: 'Empleado creado correctamente' })} />
+    if (view === 'jefe-empleados-edit') return <EditarUsuario notifyError={notifyError} user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }, { successMessage: 'Empleado actualizado correctamente' })} />
     if (view === 'jefe-tecnicos') return <TecnicosList
       users={data.users}
       onCreate={() => onNavigate('jefe-tecnicos-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-tecnicos-edit'); }}
-      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); })}
+      onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-tecnicos-create') return <CrearTecnico onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
-    if (view === 'jefe-tecnicos-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
+    if (view === 'jefe-tecnicos-create') return <CrearTecnico notifyError={notifyError} onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }, { successMessage: 'Técnico creado correctamente' })} />
+    if (view === 'jefe-tecnicos-edit') return <EditarUsuario notifyError={notifyError} user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }, { successMessage: 'Técnico actualizado correctamente' })} />
     if (view === 'jefe-incidencias') return <IncidenciasList
       incidents={data.incidents}
-      onManage={(id) => { setSelectedIncidentId(id); onNavigate('tec-gestionar'); }}
-      onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit'); }}
-      onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); })}
+      technicians={data.users.filter((u) => u.role?.name === 'tecnico')}
+      assignmentMode={data.settings?.assignment_mode || 'manual'}
+      notifyError={notifyError}
+      onAssign={(id, assignedTo) => runAction(async () => {
+        await apiFetch(`/incidents/${id}/assign`, { method: 'PATCH', body: JSON.stringify({ assigned_to: assignedTo }) })
+        await loadAll()
+      }, { successMessage: 'Incidencia asignada correctamente' })}
+      onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit') }}
+      onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return false; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Incidencia eliminada correctamente' })}
     />
-    if (view === 'jefe-incidencias-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
+    if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); }, { successMessage: 'Incidencia actualizada correctamente' })} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
-    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); })} />
+    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
     if (view === 'emp-mis') return <MisIncidencias incidents={data.incidents} onCreate={() => onNavigate('emp-crear')} onEdit={(id) => { setSelectedIncidentId(id); onNavigate('emp-edit'); }} />
-    if (view === 'emp-crear') return <CrearIncidencia settings={data.settings} onCreate={(payload, file) => runAction(async () => {
+    if (view === 'emp-crear') return <CrearIncidencia notifyError={notifyError} settings={data.settings} onCreate={(payload, file) => runAction(async () => {
       const created = await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) })
       if (file && created?.incident?.id) {
         const formData = new FormData()
@@ -479,15 +511,64 @@ function renderView(view, role, onNavigate, ctx) {
       }
       await loadAll()
       onNavigate('emp-mis')
-    })} />
-    if (view === 'emp-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
+    }, { successMessage: 'Incidencia creada correctamente' })} />
+    if (view === 'emp-edit') return <EditarIncidencia notifyError={notifyError} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); }, { successMessage: 'Incidencia actualizada correctamente' })} />
   }
   if (role === 'tecnico') {
     if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} />
-    if (view === 'tec-asignadas') return <IncidenciasAsignadas incidents={data.incidents} onManage={(id) => { setSelectedIncidentId(id); onNavigate('tec-gestionar'); }} />
-    if (view === 'tec-gestionar') return <GestionarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} apiFetch={apiFetch} onUpdated={loadAll} notifications={notifications} />
+    if (view === 'tec-disponibles') return <IncidenciasTecnico
+      title="Incidencias disponibles"
+      incidents={data.incidents}
+      currentUserId={currentUser?.id}
+      filterMode="available"
+      onTake={(id) => runAction(async () => {
+        await apiFetch(`/incidents/${id}/assign`, { method: 'PATCH' })
+        await loadAll()
+      }, { successMessage: 'Incidencia cogida correctamente' })}
+      onManage={(id) => { setSelectedIncidentId(id); setSelectedUserSource('tec-disponibles'); onNavigate('tec-gestionar'); }}
+    />
+    if (view === 'tec-asignadas') return <IncidenciasAsignadas
+      incidents={data.incidents}
+      currentUserId={currentUser?.id}
+      onTake={(id) => runAction(async () => {
+        await apiFetch(`/incidents/${id}/assign`, { method: 'PATCH' })
+        await loadAll()
+      }, { successMessage: 'Incidencia cogida correctamente' })}
+      onManage={(id) => { setSelectedIncidentId(id); setSelectedUserSource('tec-asignadas'); onNavigate('tec-gestionar'); }}
+    />
+    if (view === 'tec-gestionar') return <GestionarIncidencia
+      incident={data.incidents.find((i) => i.id === selectedIncidentId)}
+      apiFetch={apiFetch}
+      onUpdated={loadAll}
+      notifications={notifications}
+      currentUserId={currentUser?.id}
+      onTakeOwnership={async (id) => {
+        await runAction(async () => {
+          await apiFetch(`/incidents/${id}/assign`, { method: 'PATCH' })
+          await loadAll()
+        }, { successMessage: 'Incidencia cogida correctamente' })
+      }}
+      notifySuccess={ctx.notifySuccess}
+      notifyError={notifyError}
+    />
   }
   return <div className="panel">Vista no disponible</div>
+}
+
+function ToastViewport({ toasts, onDismiss }) {
+  return (
+    <div className="toast-viewport" aria-live="polite" aria-atomic="true">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast toast--${toast.type}`}>
+          <div className="toast__content">
+            <div className="toast__title">{toast.type === 'success' ? 'Exito' : 'Error'}</div>
+            <div className="toast__message">{toast.message}</div>
+          </div>
+          <button className="toast__close" onClick={() => onDismiss(toast.id)}>×</button>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function StatCards({ cards }) {
@@ -923,7 +1004,37 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
   )
 }
 
-function IncidenciasList({ incidents, onManage, onEdit, onDelete }) {
+function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual', onAssign, onEdit, onDelete, notifyError }) {
+  const [selectedTechnicians, setSelectedTechnicians] = useState({})
+  const [pendingAssignments, setPendingAssignments] = useState({})
+  const [confirmedAssignments, setConfirmedAssignments] = useState({})
+  const [assignmentModalIncidentId, setAssignmentModalIncidentId] = useState(null)
+
+  const assignmentIncident = incidents.find((incident) => incident.id === assignmentModalIncidentId) || null
+
+  const handleAssign = async (incident) => {
+    const technicianId = selectedTechnicians[incident.id] ?? (incident.assigned_to ? String(incident.assigned_to) : '')
+
+    if (!technicianId) {
+      notifyError?.('Selecciona un técnico para asignar la incidencia')
+      return
+    }
+
+    setPendingAssignments((prev) => ({ ...prev, [incident.id]: true }))
+    const result = await onAssign(incident.id, Number(technicianId))
+    setPendingAssignments((prev) => ({ ...prev, [incident.id]: false }))
+
+    if (result === null) {
+      return
+    }
+
+    setAssignmentModalIncidentId(null)
+    setConfirmedAssignments((prev) => ({ ...prev, [incident.id]: true }))
+    window.setTimeout(() => {
+      setConfirmedAssignments((prev) => ({ ...prev, [incident.id]: false }))
+    }, 1800)
+  }
+
   return (
     <div className="panel">
       <div className="panel__header">
@@ -945,11 +1056,41 @@ function IncidenciasList({ incidents, onManage, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {incidents.map((i) => (
+          {incidents.map((i) => {
+            const isPending = Boolean(pendingAssignments[i.id])
+            const isConfirmed = Boolean(confirmedAssignments[i.id])
+            const selectedValue = selectedTechnicians[i.id] ?? (i.assigned_to ? String(i.assigned_to) : '')
+            const currentValue = i.assigned_to ? String(i.assigned_to) : ''
+            const hasSelectionChange = selectedValue !== currentValue
+            const assigneeName = [i.assignee?.name, i.assignee?.last_name].filter(Boolean).join(' ') || 'Sin asignar'
+
+            return (
             <tr key={i.id}>
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
-              <td>{i.assignee?.name || '-'}</td>
+              <td className="assignment-cell">
+                {assignmentMode === 'manual' && onAssign ? (
+                  <div className="assignment-display">
+                    <span className={`assignment-display__name ${!i.assigned_to ? 'is-unassigned' : ''}`}>{assigneeName}</span>
+                    {isConfirmed ? (
+                      <span className="assignment-status">Asignado</span>
+                    ) : (
+                      <button
+                        className="assignment-edit"
+                        title={i.assigned_to ? 'Cambiar técnico' : 'Asignar técnico'}
+                        onClick={() => {
+                          setSelectedTechnicians((prev) => ({ ...prev, [i.id]: currentValue }))
+                          setAssignmentModalIncidentId(i.id)
+                        }}
+                      >
+                        <span className="assignment-edit__icon" aria-hidden="true">⇄</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  i.assignee?.name || '-'
+                )}
+              </td>
               <td><span className={`pill ${priorityClass(i.priority)}`}>{labelPriority(i.priority)}</span></td>
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
@@ -958,10 +1099,87 @@ function IncidenciasList({ incidents, onManage, onEdit, onDelete }) {
                 {onDelete && <button className="icon-btn" onClick={() => onDelete(i.id)}>🗑️</button>}
               </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
       <div className="panel__footer">{incidents.length} registros encontrados</div>
+
+      {assignmentIncident && (
+        <div className="assignment-modal-overlay" onClick={() => {
+          if (pendingAssignments[assignmentIncident.id]) return
+          setAssignmentModalIncidentId(null)
+          setSelectedTechnicians((prev) => ({
+            ...prev,
+            [assignmentIncident.id]: assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '',
+          }))
+        }}>
+          <div className="assignment-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="assignment-modal__header">
+              <div>
+                <h4>Asignar tecnico</h4>
+                <p>{assignmentIncident.title}</p>
+              </div>
+              <button
+                className="assignment-modal__close"
+                disabled={pendingAssignments[assignmentIncident.id]}
+                onClick={() => {
+                  setAssignmentModalIncidentId(null)
+                  setSelectedTechnicians((prev) => ({
+                    ...prev,
+                    [assignmentIncident.id]: assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '',
+                  }))
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <label className="assignment-modal__label">Tecnico</label>
+            <select
+              className="assignment-modal__select"
+              disabled={pendingAssignments[assignmentIncident.id]}
+              value={selectedTechnicians[assignmentIncident.id] ?? (assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '')}
+              onChange={(e) => {
+                const nextValue = e.target.value
+                setSelectedTechnicians((prev) => ({ ...prev, [assignmentIncident.id]: nextValue }))
+                setConfirmedAssignments((prev) => ({ ...prev, [assignmentIncident.id]: false }))
+              }}
+            >
+              <option value="">Sin asignar</option>
+              {technicians.map((tech) => (
+                <option key={tech.id} value={tech.id}>{tech.name} {tech.last_name || ''}</option>
+              ))}
+            </select>
+
+            <div className="assignment-modal__actions">
+              <button
+                className="assignment-modal__secondary"
+                disabled={pendingAssignments[assignmentIncident.id]}
+                onClick={() => {
+                  setAssignmentModalIncidentId(null)
+                  setSelectedTechnicians((prev) => ({
+                    ...prev,
+                    [assignmentIncident.id]: assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '',
+                  }))
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn assignment-modal__primary"
+                disabled={
+                  pendingAssignments[assignmentIncident.id] ||
+                  (selectedTechnicians[assignmentIncident.id] ?? (assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '')) ===
+                    (assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '')
+                }
+                onClick={() => handleAssign(assignmentIncident)}
+              >
+                {pendingAssignments[assignmentIncident.id] ? 'Asignando...' : 'Asignar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1007,12 +1225,16 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
   )
 }
 
-function IncidenciasAsignadas({ incidents, onManage }) {
-  const rows = incidents.filter((i) => i.assigned_to)
+function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTake, onManage }) {
+  const rows = incidents.filter((i) => {
+    if (filterMode === 'available') return !i.assigned_to
+    return i.assigned_to === currentUserId
+  })
+
   return (
     <div className="panel">
       <div className="panel__header">
-        <h3>Incidencias asignadas</h3>
+        <h3>{title}</h3>
       </div>
       <div className="search">
         <input placeholder="Buscar..." />
@@ -1022,6 +1244,7 @@ function IncidenciasAsignadas({ incidents, onManage }) {
           <tr>
             <th>Título</th>
             <th>Empleado</th>
+            <th>Técnico</th>
             <th>Prioridad</th>
             <th>Estado</th>
             <th>Fecha</th>
@@ -1033,11 +1256,13 @@ function IncidenciasAsignadas({ incidents, onManage }) {
             <tr key={i.id}>
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
+              <td>{i.assignee?.name || (i.assigned_to ? 'Asignada' : 'Sin asignar')}</td>
               <td><span className={`pill ${priorityClass(i.priority)}`}>{labelPriority(i.priority)}</span></td>
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onManage(i.id)}>✏️</button>
+                {!i.assigned_to && <button className="btn btn--primary" onClick={() => onTake(i.id)}>Coger</button>}
+                {i.assigned_to === currentUserId && <button className="icon-btn" onClick={() => onManage(i.id)}>✏️</button>}
               </td>
             </tr>
           ))}
@@ -1048,14 +1273,27 @@ function IncidenciasAsignadas({ incidents, onManage }) {
   )
 }
 
-function CrearIncidencia({ onCreate, settings }) {
+function IncidenciasAsignadas({ incidents, currentUserId, onTake, onManage }) {
+  return (
+    <IncidenciasTecnico
+      title="Mis incidencias"
+      incidents={incidents}
+      currentUserId={currentUserId}
+      filterMode="mine"
+      onTake={onTake}
+      onManage={onManage}
+    />
+  )
+}
+
+function CrearIncidencia({ onCreate, settings, notifyError }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   const [file, setFile] = useState(null)
   const categories = settings?.categories || []
   const submit = () => {
     const error = validateIncidentForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate(form, file)
@@ -1089,7 +1327,7 @@ function CrearIncidencia({ onCreate, settings }) {
   )
 }
 
-function EditarIncidencia({ incident, onBack, onSave }) {
+function EditarIncidencia({ incident, onBack, onSave, notifyError }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   useEffect(() => {
     if (incident) {
@@ -1107,7 +1345,7 @@ function EditarIncidencia({ incident, onBack, onSave }) {
   const submit = () => {
     const error = validateIncidentForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onSave(form)
@@ -1134,7 +1372,7 @@ function EditarIncidencia({ incident, onBack, onSave }) {
   )
 }
 
-function EditarUsuario({ user, onBack, onSave }) {
+function EditarUsuario({ user, onBack, onSave, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '', password: '', active: true })
   useEffect(() => {
     if (user) {
@@ -1155,7 +1393,7 @@ function EditarUsuario({ user, onBack, onSave }) {
   const submit = () => {
     const error = validateUserForm(form, { passwordOptional: true })
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
 
@@ -1203,7 +1441,7 @@ function EditarUsuario({ user, onBack, onSave }) {
   )
 }
 
-function GestionarIncidencia({ incident, apiFetch, onUpdated }) {
+function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onTakeOwnership, notifySuccess, notifyError }) {
   const [status, setStatus] = useState('open')
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState([])
@@ -1230,26 +1468,41 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated }) {
   if (!incident) return <div className="panel">Selecciona una incidencia</div>
 
   const updateStatus = async () => {
-    await apiFetch(`/incidents/${incident.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
-    await onUpdated()
+    try {
+      await apiFetch(`/incidents/${incident.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
+      await onUpdated()
+      notifySuccess?.('Estado actualizado correctamente')
+    } catch (error) {
+      notifyError?.(error.message || 'No se pudo actualizar el estado')
+    }
   }
 
   const addComment = async () => {
     if (!comment.trim()) return
-    await apiFetch(`/incidents/${incident.id}/comments`, { method: 'POST', body: JSON.stringify({ comment }) })
-    setComment('')
-    const c = await apiFetch(`/incidents/${incident.id}/comments`)
-    setComments(c.comments || [])
+    try {
+      await apiFetch(`/incidents/${incident.id}/comments`, { method: 'POST', body: JSON.stringify({ comment }) })
+      setComment('')
+      const c = await apiFetch(`/incidents/${incident.id}/comments`)
+      setComments(c.comments || [])
+      notifySuccess?.('Comentario enviado correctamente')
+    } catch (error) {
+      notifyError?.(error.message || 'No se pudo enviar el comentario')
+    }
   }
 
   const uploadAttachment = async () => {
     if (!uploadFile) return
-    const formData = new FormData()
-    formData.append('file', uploadFile)
-    await apiFetch(`/incidents/${incident.id}/attachments`, { method: 'POST', body: formData })
-    setUploadFile(null)
-    const a = await apiFetch(`/incidents/${incident.id}/attachments`)
-    setAttachments(a.attachments || [])
+    try {
+      const formData = new FormData()
+      formData.append('file', uploadFile)
+      await apiFetch(`/incidents/${incident.id}/attachments`, { method: 'POST', body: formData })
+      setUploadFile(null)
+      const a = await apiFetch(`/incidents/${incident.id}/attachments`)
+      setAttachments(a.attachments || [])
+      notifySuccess?.('Adjunto subido correctamente')
+    } catch (error) {
+      notifyError?.(error.message || 'No se pudo subir el adjunto')
+    }
   }
 
   return (
@@ -1281,14 +1534,24 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated }) {
       </div>
       <div className="panel">
         <div className="panel__title">Acciones</div>
-        <label>Cambiar estado</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="open">Abierta</option>
-          <option value="in_progress">En proceso</option>
-          <option value="resolved">Resuelta</option>
-          <option value="closed">Cerrada</option>
-        </select>
-        <button className="btn btn--success" onClick={updateStatus}>Guardar estado</button>
+        {!incident.assigned_to && onTakeOwnership && (
+          <button className="btn btn--primary" onClick={() => onTakeOwnership(incident.id)}>Coger incidencia</button>
+        )}
+        {incident.assigned_to && incident.assigned_to !== currentUserId && (
+          <div className="muted">Esta incidencia está asignada a otro técnico.</div>
+        )}
+        {(!incident.assigned_to || incident.assigned_to === currentUserId) && (
+          <>
+            <label>Cambiar estado</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="open">Abierta</option>
+              <option value="in_progress">En proceso</option>
+              <option value="resolved">Resuelta</option>
+              <option value="closed">Cerrada</option>
+            </select>
+            <button className="btn btn--success" onClick={updateStatus}>Guardar estado</button>
+          </>
+        )}
         <div className="panel__title">Adjuntos</div>
         <ul className="file-list">
           {attachments.map((a) => (
@@ -1484,12 +1747,12 @@ function FormHeader({ title, onBack }) {
   )
 }
 
-function CrearEmpresa({ onBack, onCreate }) {
+function CrearEmpresa({ onBack, onCreate, notifyError }) {
   const [form, setForm] = useState({ name: '', cif: '', address: '', email: '', phone: '', status: 'active' })
   const submit = () => {
     const error = validateCompanyForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate(form)
@@ -1518,7 +1781,7 @@ function CrearEmpresa({ onBack, onCreate }) {
   )
 }
 
-function EditarEmpresa({ company, onBack, onSave }) {
+function EditarEmpresa({ company, onBack, onSave, notifyError }) {
   const [form, setForm] = useState({ name: '', cif: '', address: '', email: '', phone: '', status: 'active' })
 
   useEffect(() => {
@@ -1539,7 +1802,7 @@ function EditarEmpresa({ company, onBack, onSave }) {
   const submit = () => {
     const error = validateCompanyForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onSave(form)
@@ -1568,12 +1831,12 @@ function EditarEmpresa({ company, onBack, onSave }) {
   )
 }
 
-function CrearJefe({ onBack, onCreate, companies }) {
+function CrearJefe({ onBack, onCreate, companies, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', company_id: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form, { requireCompany: true })
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate({ ...form, role: 'jefe_empresa' })
@@ -1607,12 +1870,12 @@ function CrearJefe({ onBack, onCreate, companies }) {
   )
 }
 
-function CrearAdmin({ onBack, onCreate }) {
+function CrearAdmin({ onBack, onCreate, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate({ ...form, role: 'admin' })
@@ -1641,12 +1904,12 @@ function CrearAdmin({ onBack, onCreate }) {
   )
 }
 
-function CrearSupervisor({ onBack, onCreate }) {
+function CrearSupervisor({ onBack, onCreate, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate({ ...form, role: 'supervisor' })
@@ -1675,12 +1938,12 @@ function CrearSupervisor({ onBack, onCreate }) {
   )
 }
 
-function CrearEmpleado({ onBack, onCreate }) {
+function CrearEmpleado({ onBack, onCreate, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', department: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate({ ...form, role: 'empleado' })
@@ -1711,12 +1974,12 @@ function CrearEmpleado({ onBack, onCreate }) {
   )
 }
 
-function CrearTecnico({ onBack, onCreate }) {
+function CrearTecnico({ onBack, onCreate, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', specialty: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form)
     if (error) {
-      alert(error)
+      notifyError?.(error)
       return
     }
     onCreate({ ...form, role: 'tecnico' })

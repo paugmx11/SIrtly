@@ -121,6 +121,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  position: relative;
 }
 
 .topbar {
@@ -174,6 +175,74 @@
   padding: 12px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   z-index: 10;
+}
+
+.toast-viewport {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #dbeafe;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.14);
+  pointer-events: auto;
+}
+
+.toast--success {
+  border-color: #bbf7d0;
+}
+
+.toast--error {
+  border-color: #fecaca;
+}
+
+.toast__content {
+  min-width: 0;
+}
+
+.toast__title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.toast--success .toast__title {
+  color: #15803d;
+}
+
+.toast--error .toast__title {
+  color: #b91c1c;
+}
+
+.toast__message {
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.toast__close {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
 }
 
 .notifications__panel ul {
@@ -355,10 +424,164 @@
 .table td {
   padding: 14px 0;
   border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
 }
 
 .actions {
   text-align: right;
+}
+
+.assignment-cell {
+  min-width: 230px;
+  padding-right: 24px;
+}
+
+.assignment-display {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.assignment-display__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: #0f172a;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignment-display__name.is-unassigned {
+  color: #94a3b8;
+}
+
+.assignment-edit {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #dbe7f3;
+  background: #f8fafc;
+  color: #64748b;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assignment-edit:hover {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.assignment-edit__icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.assignment-status {
+  flex-shrink: 0;
+  color: #059669;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.assignment-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.26);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 24px;
+}
+
+.assignment-modal {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid #dbe7f3;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+  padding: 20px;
+}
+
+.assignment-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.assignment-modal__header h4 {
+  margin: 0;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.assignment-modal__header p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.assignment-modal__close {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.assignment-modal__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.assignment-modal__select {
+  width: 100%;
+  margin-bottom: 0;
+  background: #fff;
+  height: 42px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #dbe7f3;
+  border-radius: 12px;
+}
+
+.assignment-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.assignment-modal__secondary {
+  border: 1px solid #dbe7f3;
+  background: #fff;
+  color: #475569;
+  border-radius: 999px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assignment-modal__primary {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 13px;
 }
 
 .icon-btn {
