@@ -237,34 +237,45 @@ function App() {
   if (!token) {
     return (
       <div className="login">
-        <div className="login__brand">
-          <div className="logo">S</div>
-          <div>
-            <div className="brand-title">Sirtly</div>
-            <div className="brand-sub">Gestión de incidencias multiempresa</div>
+        <div className="login__shell">
+          <div className="login__hero">
+            <div className="login__brand">
+              <BrandLogo brandName="Sirtly" />
+              <div>
+                <div className="brand-title">Sirtly</div>
+                <div className="brand-sub">Gestión de incidencias multiempresa</div>
+              </div>
+            </div>
+            <div className="login__copy">
+              <h2>Controla incidencias, equipos y empresas desde un solo lugar</h2>
+              <p>Una plataforma clara para operar el soporte técnico multiempresa con seguimiento, trazabilidad y asignación eficiente.</p>
+            </div>
+            <div className="login__panel">
+              <h3>Plataforma completa para:</h3>
+              <ul>
+                <li>Gestión centralizada de incidencias</li>
+                <li>Múltiples empresas y roles</li>
+                <li>Seguimiento en tiempo real</li>
+                <li>Estadísticas y reportes avanzados</li>
+              </ul>
+            </div>
+            <div className="login__footer">© 2026 Sirtly. Todos los derechos reservados.</div>
+          </div>
+          <div className="login__stage">
+            <div className="login__card">
+              <div className="login__eyebrow">Acceso seguro</div>
+              <h1>Iniciar sesión</h1>
+              <p>Accede a tu panel de gestión</p>
+              <form onSubmit={handleLogin}>
+                <label>Email</label>
+                <input name="email" type="email" placeholder="tu@empresa.com" />
+                <label>Contraseña</label>
+                <input name="password" type="password" placeholder="••••••••" />
+                <button className="btn btn--primary login__submit" type="submit">Iniciar sesión</button>
+              </form>
+            </div>
           </div>
         </div>
-        <div className="login__card">
-          <h1>Iniciar sesión</h1>
-          <p>Accede a tu panel de gestión</p>
-          <form onSubmit={handleLogin}>
-            <label>Email</label>
-            <input name="email" type="email" placeholder="tu@empresa.com" />
-            <label>Contraseña</label>
-            <input name="password" type="password" placeholder="••••••••" />
-            <button className="btn btn--primary" type="submit">Iniciar sesión</button>
-          </form>
-        </div>
-        <div className="login__panel">
-          <h3>Plataforma completa para:</h3>
-          <ul>
-            <li>Gestión centralizada de incidencias</li>
-            <li>Múltiples empresas y roles</li>
-            <li>Seguimiento en tiempo real</li>
-            <li>Estadísticas y reportes avanzados</li>
-          </ul>
-        </div>
-        <div className="login__footer">© 2026 Sirtly. Todos los derechos reservados.</div>
       </div>
     )
   }
@@ -337,6 +348,7 @@ function App() {
                 title={`${notifications.length} notificaciones`}
                 onClick={() => setNotificationsOpen((v) => !v)}
               >
+                <span className="bell__icon" aria-hidden="true">🔔</span>
                 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
               </button>
               {notificationsOpen && (
@@ -484,6 +496,7 @@ function renderView(view, role, onNavigate, ctx) {
     if (view === 'admin-user-edit') return <EditarUsuario
       notifyError={notifyError}
       user={selectedUser}
+      settings={data.settings}
       onBack={() => onNavigate(selectedUserSource || 'admin-jefes')}
       onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); }, { successMessage: 'Usuario actualizado correctamente' })}
     />
@@ -503,16 +516,16 @@ function renderView(view, role, onNavigate, ctx) {
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-empleados-edit'); }}
       onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-empleados-create') return <CrearEmpleado onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
-    if (view === 'jefe-empleados-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
+    if (view === 'jefe-empleados-create') return <CrearEmpleado notifyError={notifyError} settings={data.settings} onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
+    if (view === 'jefe-empleados-edit') return <EditarUsuario notifyError={notifyError} settings={data.settings} user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
     if (view === 'jefe-tecnicos') return <TecnicosList
       users={data.users}
       onCreate={() => onNavigate('jefe-tecnicos-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-tecnicos-edit'); }}
       onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-tecnicos-create') return <CrearTecnico onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
-    if (view === 'jefe-tecnicos-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
+    if (view === 'jefe-tecnicos-create') return <CrearTecnico notifyError={notifyError} settings={data.settings} onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
+    if (view === 'jefe-tecnicos-edit') return <EditarUsuario notifyError={notifyError} settings={data.settings} user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
     if (view === 'jefe-incidencias') return <IncidenciasList
       incidents={data.incidents}
       technicians={data.users.filter((u) => u.role?.name === 'tecnico')}
@@ -525,9 +538,9 @@ function renderView(view, role, onNavigate, ctx) {
       onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit') }}
       onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return false; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Incidencia eliminada correctamente' })}
     />
-    if (view === 'jefe-incidencias-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
+    if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
-    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); })} />
+    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: payload }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
@@ -542,7 +555,7 @@ function renderView(view, role, onNavigate, ctx) {
       await loadAll()
       onNavigate('emp-mis')
     })} />
-    if (view === 'emp-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
+    if (view === 'emp-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
   }
   if (role === 'tecnico') {
     if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} />
@@ -622,7 +635,7 @@ function BrandLogo({ brandLogo, brandName }) {
     return <img className="brand-logo-image" src={brandLogo} alt={brandName} />
   }
 
-  return <div className="logo">{(brandName || 'S')[0]}</div>
+  return <div className="logo">{(brandName || 'S').trim().charAt(0).toUpperCase() || 'S'}</div>
 }
 
 function RecentTable({ rows, personLabel = 'Técnico' }) {
@@ -1365,7 +1378,7 @@ function CrearIncidencia({ onCreate, settings, notifyError }) {
   )
 }
 
-function EditarIncidencia({ incident, onBack, onSave }) {
+function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   useEffect(() => {
     if (incident) {
@@ -1418,7 +1431,7 @@ function EditarIncidencia({ incident, onBack, onSave }) {
   )
 }
 
-function EditarUsuario({ user, onBack, onSave }) {
+function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '', password: '', active: true })
   const departments = settings?.departments || []
   const specialties = settings?.specialties || []
@@ -2085,7 +2098,7 @@ function CrearSupervisor({ onBack, onCreate, notifyError }) {
   )
 }
 
-function CrearEmpleado({ onBack, onCreate }) {
+function CrearEmpleado({ onBack, onCreate, settings, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', department: '', phone: '', active: true })
   const departments = settings?.departments || []
   const submit = () => {
@@ -2128,7 +2141,7 @@ function CrearEmpleado({ onBack, onCreate }) {
   )
 }
 
-function CrearTecnico({ onBack, onCreate }) {
+function CrearTecnico({ onBack, onCreate, settings, notifyError }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', specialty: '', phone: '', active: true })
   const specialties = settings?.specialties || []
   const submit = () => {
