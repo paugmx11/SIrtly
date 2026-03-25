@@ -161,6 +161,11 @@ INSERT INTO incident_status (id, name) VALUES
 (4, 'cerrada')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
+
+-- DATOS INSERTS 
+
+
+
 -- Companies
 INSERT INTO companies (id, name, cif, email, phone, address, status) VALUES
 (1, 'TechSolutions S.L.', 'B12345678', 'info@techsolutions.es', '+34 912 345 678', 'Calle Mayor 1, Madrid', 'active'),

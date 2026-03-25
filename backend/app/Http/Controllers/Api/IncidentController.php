@@ -21,6 +21,53 @@ class IncidentController extends Controller
         'closed' => 'cerrada',
     ];
 
+
+    private function technicianCandidates(int $companyId)
+    {
+        return User::query()
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->whereHas('role', function ($q) {
+                $q->where('name', 'tecnico');
+            });
+    }
+
+    private function pickLeastLoadedTechnician($query): ?int
+    {
+        return $query
+            ->withCount([
+                'assignedIncidents as active_workload' => function ($incidentQuery) {
+                    $incidentQuery->whereHas('status', function ($statusQuery) {
+                        $statusQuery->whereIn('name', ['abierta', 'en_progreso']);
+                    });
+                },
+            ])
+            ->orderBy('active_workload')
+            ->orderBy('id')
+            ->value('id');
+    }
+
+    private function resolveAssignment(int $companyId, string $assignmentMode, ?string $category): ?int
+    {
+        $technicians = $this->technicianCandidates($companyId);
+
+        if ($assignmentMode === 'specialty' && $category) {
+            $match = $this->pickLeastLoadedTechnician(
+                (clone $technicians)->where('specialty', 'LIKE', '%' . $category . '%')
+            );
+
+            if ($match) {
+                return $match;
+            }
+        }
+
+        if (in_array($assignmentMode, ['auto', 'specialty'], true)) {
+            return $this->pickLeastLoadedTechnician(clone $technicians);
+        }
+
+        return null;
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -74,21 +121,11 @@ class IncidentController extends Controller
 
         $assignedTo = $validated['assigned_to'] ?? null;
         if (!$assignedTo && $assignmentMode !== 'manual') {
-            $technicians = User::where('company_id', $user->company_id)
-                ->whereHas('role', function ($q) {
-                    $q->where('name', 'tecnico');
-                });
-
-            if ($assignmentMode === 'specialty' && !empty($validated['category'])) {
-                $assignedTo = (clone $technicians)
-                    ->where('specialty', 'LIKE', '%' . $validated['category'] . '%')
-                    ->orderBy('id')
-                    ->value('id');
-            }
-
-            if (!$assignedTo && $assignmentMode === 'auto') {
-                $assignedTo = (clone $technicians)->orderBy('id')->value('id');
-            }
+            $assignedTo = $this->resolveAssignment(
+                $user->company_id,
+                $assignmentMode,
+                $validated['category'] ?? null,
+            );
         }
 
         $defaultStatus = IncidentStatus::where('name', self::STATUS_MAP['open'])->first();

@@ -56,6 +56,14 @@ const API_BASE = 'http://127.0.0.1:8000/api'
 const API_ROOT = API_BASE.replace('/api', '')
 const PHONE_PATTERN = '^\\+?[0-9\\s()\\-]{7,20}$'
 const CIF_PATTERN = '^[A-Za-z0-9\\-]{5,20}$'
+const COLOR_PRESETS = [
+  ['#2D61E5', '#7C3AED'],
+  ['#0F766E', '#14B8A6'],
+  ['#B45309', '#F97316'],
+  ['#BE123C', '#F43F5E'],
+  ['#334155', '#64748B'],
+  ['#166534', '#22C55E'],
+]
 
 function App() {
   const [token, setToken] = useState('')
@@ -90,6 +98,28 @@ function App() {
     if (role === 'empleado') return EMPLEADO_MENU
     return TECNICO_MENU
   }, [role])
+
+  const currentBranding = (role === 'jefe_empresa' || role === 'empleado' || role === 'tecnico') ? data.settings : null
+  const brandPrimary = currentBranding?.primary_color || '#2563eb'
+  const brandSecondary = currentBranding?.secondary_color || '#7c3aed'
+  const brandName = currentBranding?.system_name?.trim() || 'Sirtly'
+  const brandLogo = currentBranding?.logo ? `${API_ROOT}/storage/${currentBranding.logo}` : null
+  const brandFavicon = currentBranding?.favicon ? `${API_ROOT}/storage/${currentBranding.favicon}` : null
+
+  useEffect(() => {
+    const pageTitle = currentBranding?.system_name?.trim() || 'Sirtly'
+    document.title = pageTitle
+
+    if (!brandFavicon) return
+
+    let link = document.querySelector("link[rel='icon']")
+    if (!link) {
+      link = document.createElement('link')
+      link.setAttribute('rel', 'icon')
+      document.head.appendChild(link)
+    }
+    link.setAttribute('href', brandFavicon)
+  }, [currentBranding, brandFavicon])
 
   const showToast = (type, message) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -263,12 +293,12 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--brand-primary': brandPrimary, '--brand-secondary': brandSecondary }}>
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <div className="logo">S</div>
+          <BrandLogo brandLogo={brandLogo} brandName={brandName} />
           <div>
-            <div className="brand-title">Sirtly</div>
+            <div className="brand-title">{brandName}</div>
             <div className="brand-sub">{ROLE_LABELS[role]}</div>
           </div>
         </div>
@@ -473,16 +503,16 @@ function renderView(view, role, onNavigate, ctx) {
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-empleados-edit'); }}
       onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-empleados-create') return <CrearEmpleado notifyError={notifyError} onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }, { successMessage: 'Empleado creado correctamente' })} />
-    if (view === 'jefe-empleados-edit') return <EditarUsuario notifyError={notifyError} user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }, { successMessage: 'Empleado actualizado correctamente' })} />
+    if (view === 'jefe-empleados-create') return <CrearEmpleado onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
+    if (view === 'jefe-empleados-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
     if (view === 'jefe-tecnicos') return <TecnicosList
       users={data.users}
       onCreate={() => onNavigate('jefe-tecnicos-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-tecnicos-edit'); }}
       onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-tecnicos-create') return <CrearTecnico notifyError={notifyError} onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }, { successMessage: 'Técnico creado correctamente' })} />
-    if (view === 'jefe-tecnicos-edit') return <EditarUsuario notifyError={notifyError} user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }, { successMessage: 'Técnico actualizado correctamente' })} />
+    if (view === 'jefe-tecnicos-create') return <CrearTecnico onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
+    if (view === 'jefe-tecnicos-edit') return <EditarUsuario user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
     if (view === 'jefe-incidencias') return <IncidenciasList
       incidents={data.incidents}
       technicians={data.users.filter((u) => u.role?.name === 'tecnico')}
@@ -495,9 +525,9 @@ function renderView(view, role, onNavigate, ctx) {
       onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit') }}
       onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return false; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Incidencia eliminada correctamente' })}
     />
-    if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); }, { successMessage: 'Incidencia actualizada correctamente' })} />
+    if (view === 'jefe-incidencias-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
-    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
+    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); })} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
@@ -511,8 +541,8 @@ function renderView(view, role, onNavigate, ctx) {
       }
       await loadAll()
       onNavigate('emp-mis')
-    }, { successMessage: 'Incidencia creada correctamente' })} />
-    if (view === 'emp-edit') return <EditarIncidencia notifyError={notifyError} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); }, { successMessage: 'Incidencia actualizada correctamente' })} />
+    })} />
+    if (view === 'emp-edit') return <EditarIncidencia incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
   }
   if (role === 'tecnico') {
     if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} />
@@ -585,6 +615,14 @@ function StatCards({ cards }) {
       ))}
     </div>
   )
+}
+
+function BrandLogo({ brandLogo, brandName }) {
+  if (brandLogo) {
+    return <img className="brand-logo-image" src={brandLogo} alt={brandName} />
+  }
+
+  return <div className="logo">{(brandName || 'S')[0]}</div>
 }
 
 function RecentTable({ rows, personLabel = 'Técnico' }) {
@@ -1327,7 +1365,7 @@ function CrearIncidencia({ onCreate, settings, notifyError }) {
   )
 }
 
-function EditarIncidencia({ incident, onBack, onSave, notifyError }) {
+function EditarIncidencia({ incident, onBack, onSave }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   useEffect(() => {
     if (incident) {
@@ -1351,6 +1389,8 @@ function EditarIncidencia({ incident, onBack, onSave, notifyError }) {
     onSave(form)
   }
 
+  const categories = settings?.categories || []
+
   return (
     <div className="panel form">
       <FormHeader title="Editar incidencia" onBack={onBack} />
@@ -1358,8 +1398,14 @@ function EditarIncidencia({ incident, onBack, onSave, notifyError }) {
       <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
       <label>Descripción</label>
       <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-      <label>Categoría</label>
-      <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+      <SuggestionInput
+        label="Categoría"
+        value={form.category}
+        suggestions={categories}
+        listId="incident-categories-edit"
+        placeholder="Hardware, Software, Red..."
+        onChange={(e) => setForm({ ...form, category: e.target.value })}
+      />
       <label>Prioridad</label>
       <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
         <option value="low">Baja</option>
@@ -1372,8 +1418,10 @@ function EditarIncidencia({ incident, onBack, onSave, notifyError }) {
   )
 }
 
-function EditarUsuario({ user, onBack, onSave, notifyError }) {
+function EditarUsuario({ user, onBack, onSave }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '', password: '', active: true })
+  const departments = settings?.departments || []
+  const specialties = settings?.specialties || []
   useEffect(() => {
     if (user) {
       setForm({
@@ -1425,10 +1473,22 @@ function EditarUsuario({ user, onBack, onSave, notifyError }) {
       <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       <label>Teléfono</label>
       <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Departamento</label>
-      <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
-      <label>Especialidad</label>
-      <input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
+      <SuggestionInput
+        label="Departamento"
+        value={form.department}
+        suggestions={departments}
+        listId="edit-user-departments"
+        placeholder="Desarrollo, Marketing..."
+        onChange={(e) => setForm({ ...form, department: e.target.value })}
+      />
+      <SuggestionInput
+        label="Especialidad"
+        value={form.specialty}
+        suggestions={specialties}
+        listId="edit-user-specialties"
+        placeholder="Redes, Software..."
+        onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+      />
       <label>Nueva contraseña (opcional)</label>
       <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
       <label>Estado</label>
@@ -1637,12 +1697,18 @@ function ConfiguracionEmpresa({ settings, onSave }) {
     primary_color: settings?.primary_color || '#2D61E5',
     secondary_color: settings?.secondary_color || '#7C3AED',
     system_name: settings?.system_name || '',
+    logo: settings?.logo || '',
+    favicon: settings?.favicon || '',
     assignment_mode: settings?.assignment_mode || 'manual',
     categories: (settings?.categories || []).join(', '),
     priorities: (settings?.priorities || []).join(', '),
     departments: (settings?.departments || []).join(', '),
     specialties: (settings?.specialties || []).join(', '),
   })
+  const [logoFile, setLogoFile] = useState(null)
+  const [faviconFile, setFaviconFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState(settings?.logo ? `${API_ROOT}/storage/${settings.logo}` : '')
+  const [faviconPreview, setFaviconPreview] = useState(settings?.favicon ? `${API_ROOT}/storage/${settings.favicon}` : '')
 
   useEffect(() => {
     if (settings) {
@@ -1650,26 +1716,34 @@ function ConfiguracionEmpresa({ settings, onSave }) {
         primary_color: settings.primary_color || '#2D61E5',
         secondary_color: settings.secondary_color || '#7C3AED',
         system_name: settings.system_name || '',
+        logo: settings.logo || '',
+        favicon: settings.favicon || '',
         assignment_mode: settings.assignment_mode || 'manual',
         categories: (settings.categories || []).join(', '),
         priorities: (settings.priorities || []).join(', '),
         departments: (settings.departments || []).join(', '),
         specialties: (settings.specialties || []).join(', '),
       })
+      setLogoPreview(settings.logo ? `${API_ROOT}/storage/${settings.logo}` : '')
+      setFaviconPreview(settings.favicon ? `${API_ROOT}/storage/${settings.favicon}` : '')
     }
   }, [settings])
 
   const handleSave = () => {
-    onSave({
-      primary_color: form.primary_color,
-      secondary_color: form.secondary_color,
-      system_name: form.system_name,
-      assignment_mode: form.assignment_mode,
-      categories: splitCsv(form.categories),
-      priorities: splitCsv(form.priorities),
-      departments: splitCsv(form.departments),
-      specialties: splitCsv(form.specialties),
-    })
+    const payload = new FormData()
+    payload.append('primary_color', form.primary_color)
+    payload.append('secondary_color', form.secondary_color)
+    payload.append('system_name', form.system_name)
+    payload.append('assignment_mode', form.assignment_mode)
+    splitCsv(form.categories).forEach((item) => payload.append('categories[]', item))
+    splitCsv(form.priorities).forEach((item) => payload.append('priorities[]', item))
+    splitCsv(form.departments).forEach((item) => payload.append('departments[]', item))
+    splitCsv(form.specialties).forEach((item) => payload.append('specialties[]', item))
+    if (logoFile) payload.append('logo_file', logoFile)
+    if (faviconFile) payload.append('favicon_file', faviconFile)
+    if (!logoFile && form.logo) payload.append('logo', form.logo)
+    if (!faviconFile && form.favicon) payload.append('favicon', form.favicon)
+    onSave(payload)
   }
 
   return (
@@ -1678,12 +1752,63 @@ function ConfiguracionEmpresa({ settings, onSave }) {
       <div className="grid-2">
         <div className="panel">
           <div className="panel__title">Personalización visual</div>
-          <div className="color-row">
-            <span className="color-dot" style={{ background: form.primary_color }} />
-            <span className="color-dot" style={{ background: form.secondary_color }} />
+          <div className="theme-preview" style={{ '--brand-primary': form.primary_color, '--brand-secondary': form.secondary_color }}>
+            <div className="theme-preview__sidebar">
+              {logoPreview ? <img className="theme-preview__logo" src={logoPreview} alt="Logo" /> : <div className="theme-preview__logo-fallback">{(form.system_name || 'S')[0]}</div>}
+              <div className="theme-preview__title">{form.system_name || 'Nombre de sistema'}</div>
+            </div>
+            <div className="theme-preview__content">
+              <div className="theme-preview__chip">Abierta</div>
+              <div className="theme-preview__button">Acción principal</div>
+            </div>
+          </div>
+          <label>Paleta visual</label>
+          <div className="palette-grid">
+            {COLOR_PRESETS.map(([primary, secondary]) => (
+              <button
+                key={`${primary}-${secondary}`}
+                type="button"
+                className={`palette-option ${form.primary_color === primary && form.secondary_color === secondary ? 'active' : ''}`}
+                onClick={() => setForm({ ...form, primary_color: primary, secondary_color: secondary })}
+              >
+                <span className="palette-swatch" style={{ background: primary }} />
+                <span className="palette-swatch" style={{ background: secondary }} />
+              </button>
+            ))}
+          </div>
+          <div className="config-colors">
+            <div>
+              <label>Color principal</label>
+              <input type="color" value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} />
+            </div>
+            <div>
+              <label>Color secundario</label>
+              <input type="color" value={form.secondary_color} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} />
+            </div>
           </div>
           <label>Nombre visible</label>
           <input value={form.system_name} onChange={(e) => setForm({ ...form, system_name: e.target.value })} placeholder="TechSolutions S.L." />
+          <label>Logo de la empresa</label>
+          <input type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={(e) => {
+            const file = e.target.files?.[0] || null
+            setLogoFile(file)
+            if (file) setLogoPreview(URL.createObjectURL(file))
+          }} />
+          <label>Favicon</label>
+          <input type="file" accept=".png,.ico,.svg,.webp" onChange={(e) => {
+            const file = e.target.files?.[0] || null
+            setFaviconFile(file)
+            if (file) setFaviconPreview(URL.createObjectURL(file))
+          }} />
+          {faviconPreview && <img className="favicon-preview" src={faviconPreview} alt="Favicon" />}
+          <div className="config-note">
+            El logo y la identidad visual se aplican en los paneles de jefe de empresa, técnico y empleado.
+          </div>
+          <div className="config-highlight">
+            <span>Sidebar personalizada</span>
+            <span>Botones con color de marca</span>
+            <span>Favicon propio</span>
+          </div>
         </div>
         <div className="panel">
           <div className="panel__title">Funcionalidades</div>
@@ -1693,6 +1818,11 @@ function ConfiguracionEmpresa({ settings, onSave }) {
             <option value="auto">Automático</option>
             <option value="specialty">Por especialidad</option>
           </select>
+          <div className="config-note">
+            Manual: el técnico o el jefe asignan la incidencia.
+            Automático: se asigna al técnico activo con menor carga de trabajo.
+            Por especialidad: primero intenta encajar categoría y especialidad; si no hay coincidencia, cae al técnico con menor carga.
+          </div>
           <label className="block">Categorías (coma separadas)</label>
           <input className="block" value={form.categories} onChange={(e) => setForm({ ...form, categories: e.target.value })} placeholder="Hardware, Software, Red" />
           <label className="block">Prioridades (coma separadas)</label>
@@ -1705,6 +1835,23 @@ function ConfiguracionEmpresa({ settings, onSave }) {
       </div>
       <div className="actions-right"><button className="btn btn--primary" onClick={handleSave}>Guardar configuración</button></div>
     </div>
+  )
+}
+
+
+function SuggestionInput({ label, value, onChange, placeholder, suggestions, listId }) {
+  const items = (suggestions || []).filter(Boolean)
+
+  return (
+    <>
+      <label>{label}</label>
+      <input value={value} list={items.length ? listId : undefined} onChange={onChange} placeholder={placeholder} />
+      {items.length > 0 && (
+        <datalist id={listId}>
+          {items.map((item) => <option key={item} value={item} />)}
+        </datalist>
+      )}
+    </>
   )
 }
 
@@ -1938,8 +2085,9 @@ function CrearSupervisor({ onBack, onCreate, notifyError }) {
   )
 }
 
-function CrearEmpleado({ onBack, onCreate, notifyError }) {
+function CrearEmpleado({ onBack, onCreate }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', department: '', phone: '', active: true })
+  const departments = settings?.departments || []
   const submit = () => {
     const error = validateUserForm(form)
     if (error) {
@@ -1960,8 +2108,14 @@ function CrearEmpleado({ onBack, onCreate, notifyError }) {
       <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
       <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-      <label>Departamento (opcional)</label>
-      <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
+      <SuggestionInput
+        label="Departamento (opcional)"
+        value={form.department}
+        suggestions={departments}
+        listId="employee-departments"
+        placeholder="Desarrollo, Marketing..."
+        onChange={(e) => setForm({ ...form, department: e.target.value })}
+      />
       <label>Teléfono</label>
       <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
       <label>Estado</label>
@@ -1974,8 +2128,9 @@ function CrearEmpleado({ onBack, onCreate, notifyError }) {
   )
 }
 
-function CrearTecnico({ onBack, onCreate, notifyError }) {
+function CrearTecnico({ onBack, onCreate }) {
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', specialty: '', phone: '', active: true })
+  const specialties = settings?.specialties || []
   const submit = () => {
     const error = validateUserForm(form)
     if (error) {
@@ -1996,8 +2151,14 @@ function CrearTecnico({ onBack, onCreate, notifyError }) {
       <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
       <label>Contraseña</label>
       <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-      <label>Especialidad (opcional)</label>
-      <input value={form.specialty} onChange={(e) => setForm({ ...form, specialty: e.target.value })} />
+      <SuggestionInput
+        label="Especialidad (opcional)"
+        value={form.specialty}
+        suggestions={specialties}
+        listId="technician-specialties"
+        placeholder="Redes, Software..."
+        onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+      />
       <label>Teléfono</label>
       <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
       <label>Estado</label>
