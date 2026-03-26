@@ -11,6 +11,31 @@
 - Authentication: Laravel Sanctum
 - Recommended DB client: DBeaver
 
+## Core Features
+- Multi-company incident management
+- Role-based access control for `admin`, `supervisor`, `jefe_empresa`, `tecnico`, and `empleado`
+- Authentication with Laravel Sanctum tokens
+- Company and user management
+- Incident lifecycle management with assignment and status flow
+- Comments, attachments, and internal notifications
+- Company-level branding and workflow settings
+
+## Requirements
+- PHP 8.2+
+- Composer
+- Node.js 20+
+- npm 10+
+- MySQL 8.x compatible server
+
+## Project Structure
+```text
+sirtly/
+├── backend/                # Laravel API
+├── frontend/               # React + Vite application
+├── .sql                    # Canonical database schema + demo data
+└── README.md
+```
+
 ## Backend Architecture
 The backend is implemented in Laravel using Eloquent ORM as the data access layer.
 
@@ -186,7 +211,9 @@ DB_DATABASE=sirtly_db
 DB_USERNAME=root
 DB_PASSWORD=asdqwe123
 
-SESSION_DRIVER=database
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
 ```
 
 ## Local Environment Notes
@@ -218,6 +245,16 @@ Important:
 - Do not rely on Laravel migrations to create framework tables such as `sessions` or `cache`
 - If a teammate pulls the project for the first time, they must create their own `backend/.env` based on these values
 
+## Local URLs
+- Frontend: `http://127.0.0.1:5173`
+- Backend API: `http://127.0.0.1:8000/api`
+- Backend root: `http://127.0.0.1:8000`
+
+Notes:
+- The frontend is the main application entry point for day-to-day use
+- The backend root is a Laravel web route context and is not the main product UI
+- Most API endpoints require a Bearer token and should be tested with Postman, Insomnia, curl, or the frontend itself
+
 ## Local Setup
 Import the SQL schema and demo data first.
 
@@ -248,28 +285,3 @@ npm run dev
 - Form validation exists in both frontend and backend for core fields such as email, password, phone, CIF, and required fields.
 - File uploads use Laravel public storage, so `php artisan storage:link` is required.
 - Admin user creation, supervisor creation, company manager creation, employee creation, technician creation, company creation, company editing, and incident editing are aligned with the current UI and API rules.
-
-## Feature Commit Traceability
-The project history is organized around functional milestones. Relevant commits currently available in the repository:
-
-- `5cc70b3` - Initial project setup with Laravel backend and React frontend
-- `0c90e0c` - Backend aligned with SQL schema and role flow
-- `e489e33` - Initial project README
-- `da3b500` - Documentation for `sessions` and `personal_access_tokens`
-- `b673f4e` - Frontend aligned with database-driven flow and seeds
-- `c119d5b` - Laravel API routing bootstrap and Sanctum fix
-- `06411c8` - Incident flow UI, notifications, and attachments
-
-## Suggested Issue Mapping
-If you need the repository to show explicit issue tracking, create GitHub issues associated with these functional blocks:
-
-- `Issue 1` - Initial project setup and repository structure
-- `Issue 2` - SQL schema design and role model alignment
-- `Issue 3` - Authentication with Laravel Sanctum
-- `Issue 4` - User and company management
-- `Issue 5` - Incident lifecycle implementation
-- `Issue 6` - Comments, attachments, and notifications
-- `Issue 7` - Frontend integration with real API data
-- `Issue 8` - Validation, documentation, and final review
-
-This environment does not have the GitHub CLI installed, so actual GitHub issues must be created directly in the repository web interface.
