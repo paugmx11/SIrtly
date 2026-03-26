@@ -189,6 +189,35 @@ DB_PASSWORD=asdqwe123
 SESSION_DRIVER=database
 ```
 
+## Local Environment Notes
+
+Each developer must keep their own local `backend/.env` file. This file is ignored by Git and is not shared through GitHub.
+
+Recommended Laravel local configuration for this project:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sirtly_db
+DB_USERNAME=your_mysql_user
+DB_PASSWORD=your_mysql_password
+
+SESSION_DRIVER=file
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
+```
+
+Why these values matter:
+- `SESSION_DRIVER=file`: avoids requiring a `sessions` table in MySQL
+- `CACHE_STORE=file`: avoids requiring a `cache` table in MySQL
+- `QUEUE_CONNECTION=sync`: runs jobs immediately in local development and avoids queue storage setup
+
+Important:
+- The project uses the root `.sql` file as the source of truth for the database schema
+- Do not rely on Laravel migrations to create framework tables such as `sessions` or `cache`
+- If a teammate pulls the project for the first time, they must create their own `backend/.env` based on these values
+
 ## Local Setup
 Import the SQL schema and demo data first.
 
