@@ -4,6 +4,11 @@
 - GitHub repository: `git@github.com:paugmx11/SIrtly.git`
 - Public repository URL: `https://github.com/paugmx11/SIrtly`
 
+## License
+- Source code: `MIT` license. See `LICENSE`
+- Documentation and original visual/presentation assets: `CC BY-NC 4.0`. See `LICENSE-ASSETS.md`
+- Third-party resources must keep their original licenses and should only be used if legally compatible
+
 ## Stack
 - Backend: PHP, Laravel, REST API
 - Frontend: JavaScript, React, Vite
@@ -281,6 +286,9 @@ npm run dev
 - Password: `asdqwe123`
 
 ## Notes
+- The repository includes automated PHPUnit tests for authentication, authorization, incident workflow, comments, branding settings, and core management flows.
+- Test execution uses a dedicated MySQL testing database (`sirtly_test`) instead of the project `.sql` schema in order to keep application tests isolated from local demo data.
+- Code is distributed under the MIT license, while documentation and original project presentation assets are covered by CC BY-NC 4.0.
 - The frontend consumes live API data. There are no mock datasets in the current UI flow.
 - Form validation exists in both frontend and backend for core fields such as email, password, phone, CIF, and required fields.
 - File uploads use Laravel public storage, so `php artisan storage:link` is required.
