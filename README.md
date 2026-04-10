@@ -229,8 +229,8 @@ DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=sirtly_db
-DB_USERNAME=root
-DB_PASSWORD=asdqwe123
+DB_USERNAME=your_mysql_user
+DB_PASSWORD=your_mysql_password
 
 SESSION_DRIVER=file
 CACHE_STORE=file
@@ -266,18 +266,39 @@ Important:
 - Do not rely on Laravel migrations to create framework tables such as `sessions` or `cache`
 - If a teammate pulls the project for the first time, they must create their own `backend/.env` based on these values
 
-## Local URLs
-- Frontend: `http://127.0.0.1:5173`
-- Backend API: `http://127.0.0.1:8000/api`
-- Backend root: `http://127.0.0.1:8000`
+## Docker Setup
+The project is prepared to run locally and in deployment-oriented environments using Docker.
 
-Notes:
+Main files:
+- `frontend/Dockerfile`
+- `backend/Dockerfile`
+- `database/Dockerfile`
+- `docker-compose.yml`
+
+Default local Docker URLs:
+- Frontend: `http://localhost:8080`
+- Backend API: `http://localhost:8000/api`
+- Backend root: `http://localhost:8000`
+
+Run locally with Docker:
+
+```bash
+docker compose build
+docker compose up
+```
+
+Important notes:
 - The frontend is the main application entry point for day-to-day use
 - The backend root is a Laravel web route context and is not the main product UI
+- The MySQL service is internal only and is not exposed publicly in the default Docker setup
+- File uploads and branding assets are persisted through the backend storage volume
+- The root `.sql` file is loaded by the database container on first initialization
 - Most API endpoints require a Bearer token and should be tested with Postman, Insomnia, curl, or the frontend itself
 
-## Local Setup
-Import the SQL schema and demo data first.
+## Manual Development Setup
+If Docker is not being used, developers can still run the project manually.
+
+Import the SQL schema and demo data first, then use:
 
 Backend:
 
@@ -296,10 +317,6 @@ cd frontend
 npm install
 npm run dev
 ```
-
-## Demo Credentials
-- Email: `admin@sistema.com`
-- Password: `asdqwe123`
 
 ## Notes
 - The repository includes automated PHPUnit tests for authentication, authorization, incident workflow, comments, branding settings, and core management flows.
