@@ -109,6 +109,22 @@ Key Eloquent relationships currently implemented:
 - `tecnico`: works on assigned incidents, updates status, adds comments, uploads attachments.
 - `empleado`: creates incidents and tracks their own incidents.
 
+## Company Ownership Model
+- The current data model assumes that each `jefe_empresa` belongs to exactly one company.
+- This is implemented through the `users.company_id` column.
+- This means the current project supports:
+  - one company manager per user account
+  - one company context for each employee and technician
+  - direct filtering of incidents, users, settings, and statistics by `company_id`
+
+This was kept intentionally because it makes:
+- authorization rules simpler
+- dashboard behavior clearer
+- company branding and settings easier to resolve
+- incident filtering and reporting more predictable
+
+A more complex SaaS model could allow one company manager to manage multiple companies, but that would require a different database design, usually with a join table instead of a single `company_id` on `users`. For this project, the one-manager-one-company approach was considered the most stable and maintainable choice.
+
 ## User Creation Flow
 - The first `admin` is inserted manually in the database.
 - An `admin` can create:
