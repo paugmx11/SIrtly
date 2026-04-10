@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import PublicPortal from './pages/PublicPortal.jsx'
+import sirtlyLogo from './assets/Logo Sirtly.png'
 
 const ROLE_LABELS = {
   admin: 'Administrador',
@@ -99,7 +101,7 @@ function App() {
     return TECNICO_MENU
   }, [role])
 
-  const currentBranding = (role === 'jefe_empresa' || role === 'empleado' || role === 'tecnico') ? data.settings : null
+  const currentBranding = token && (role === 'jefe_empresa' || role === 'empleado' || role === 'tecnico') ? data.settings : null
   const brandPrimary = currentBranding?.primary_color || '#2563eb'
   const brandSecondary = currentBranding?.secondary_color || '#7c3aed'
   const brandName = currentBranding?.system_name?.trim() || 'Sirtly'
@@ -110,15 +112,13 @@ function App() {
     const pageTitle = currentBranding?.system_name?.trim() || 'Sirtly'
     document.title = pageTitle
 
-    if (!brandFavicon) return
-
     let link = document.querySelector("link[rel='icon']")
     if (!link) {
       link = document.createElement('link')
       link.setAttribute('rel', 'icon')
       document.head.appendChild(link)
     }
-    link.setAttribute('href', brandFavicon)
+    link.setAttribute('href', brandFavicon || sirtlyLogo)
   }, [currentBranding, brandFavicon])
 
   const showToast = (type, message) => {
@@ -236,47 +236,13 @@ function App() {
 
   if (!token) {
     return (
-      <div className="login">
-        <div className="login__shell">
-          <div className="login__hero">
-            <div className="login__brand">
-              <BrandLogo brandName="Sirtly" />
-              <div>
-                <div className="brand-title">Sirtly</div>
-                <div className="brand-sub">Gestión de incidencias multiempresa</div>
-              </div>
-            </div>
-            <div className="login__copy">
-              <h2>Controla incidencias, equipos y empresas desde un solo lugar</h2>
-              <p>Una plataforma clara para operar el soporte técnico multiempresa con seguimiento, trazabilidad y asignación eficiente.</p>
-            </div>
-            <div className="login__panel">
-              <h3>Plataforma completa para:</h3>
-              <ul>
-                <li>Gestión centralizada de incidencias</li>
-                <li>Múltiples empresas y roles</li>
-                <li>Seguimiento en tiempo real</li>
-                <li>Estadísticas y reportes avanzados</li>
-              </ul>
-            </div>
-            <div className="login__footer">© 2026 Sirtly. Todos los derechos reservados.</div>
-          </div>
-          <div className="login__stage">
-            <div className="login__card">
-              <div className="login__eyebrow">Acceso seguro</div>
-              <h1>Iniciar sesión</h1>
-              <p>Accede a tu panel de gestión</p>
-              <form onSubmit={handleLogin}>
-                <label>Email</label>
-                <input name="email" type="email" placeholder="tu@empresa.com" />
-                <label>Contraseña</label>
-                <input name="password" type="password" placeholder="••••••••" />
-                <button className="btn btn--primary login__submit" type="submit">Iniciar sesión</button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PublicPortal
+        onLogin={handleLogin}
+        notifyError={notifyError}
+        onContactSubmit={(payload) => {
+          notifySuccess(`Gracias ${payload.name}. Mauro y Pau revisarán tu mensaje para preparar la demo.`)
+        }}
+      />
     )
   }
 
@@ -307,7 +273,7 @@ function App() {
     <div className="app" style={{ '--brand-primary': brandPrimary, '--brand-secondary': brandSecondary }}>
       <aside className="sidebar">
         <div className="sidebar__brand">
-          <BrandLogo brandLogo={brandLogo} brandName={brandName} />
+          <BrandLogo brandLogo={brandLogo} brandName={brandName} product={!brandLogo && brandName === 'Sirtly'} />
           <div>
             <div className="brand-title">{brandName}</div>
             <div className="brand-sub">{ROLE_LABELS[role]}</div>
@@ -334,6 +300,21 @@ function App() {
         </div>
         <button className="logout" onClick={async () => {
           try { await apiFetch('/auth/logout', { method: 'POST' }) } catch { }
+          setUser(null)
+          setRole('admin')
+          setView('admin-dashboard')
+          setData({
+            companies: [],
+            users: [],
+            incidents: [],
+            statsSystem: null,
+            statsCompany: null,
+            byCompany: [],
+            byTechnician: [],
+            settings: null,
+            comments: [],
+            attachments: [],
+          })
           setToken('')
         }}>Cerrar sesión</button>
       </aside>
@@ -630,9 +611,13 @@ function StatCards({ cards }) {
   )
 }
 
-function BrandLogo({ brandLogo, brandName }) {
+function BrandLogo({ brandLogo, brandName, product = false }) {
   if (brandLogo) {
     return <img className="brand-logo-image" src={brandLogo} alt={brandName} />
+  }
+
+  if (product) {
+    return <img className="brand-logo-image brand-logo-image--product" src={sirtlyLogo} alt={brandName || 'Sirtly'} />
   }
 
   return <div className="logo">{(brandName || 'S').trim().charAt(0).toUpperCase() || 'S'}</div>

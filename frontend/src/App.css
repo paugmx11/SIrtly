@@ -37,9 +37,13 @@
 .brand-logo-image {
   width: 42px;
   height: 42px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 12px;
-  background: #fff;
+  background: transparent;
+}
+
+.brand-logo-image--product {
+  border-radius: 14px;
 }
 
 .brand-title {
