@@ -1096,3 +1096,22 @@
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .grid-2 { grid-template-columns: 1fr; }
 }
+
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.icon-btn:hover,
+.icon-btn:focus-visible,
+.assignment-edit:hover,
+.assignment-edit:focus-visible,
+.link:hover,
+.link:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}

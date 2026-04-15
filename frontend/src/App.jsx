@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import './App.css'
 import PublicPortal from './pages/PublicPortal.jsx'
 import sirtlyLogo from './assets/Logo Sirtly.png'
@@ -54,7 +54,7 @@ const TECNICO_MENU = [
   { key: 'tec-asignadas', label: 'Mis incidencias', icon: 'file' },
 ]
 
-const API_BASE = 'http://127.0.0.1:8000/api'
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '')
 const API_ROOT = API_BASE.replace('/api', '')
 const PHONE_PATTERN = '^\\+?[0-9\\s()\\-]{7,20}$'
 const CIF_PATTERN = '^[A-Za-z0-9\\-]{5,20}$'
@@ -283,7 +283,9 @@ function App() {
           {menu.map((item) => (
             <button
               key={item.key}
+              type="button"
               className={`nav-item ${activeKey === item.key ? 'active' : ''}`}
+              aria-current={activeKey === item.key ? 'page' : undefined}
               onClick={() => setView(item.key)}
             >
               <span className={`icon icon--${item.icon}`} />
@@ -298,7 +300,7 @@ function App() {
             <div className="profile-role">{ROLE_LABELS[role]}</div>
           </div>
         </div>
-        <button className="logout" onClick={async () => {
+        <button type="button" className="logout" onClick={async () => {
           try { await apiFetch('/auth/logout', { method: 'POST' }) } catch { }
           setUser(null)
           setRole('admin')
@@ -325,8 +327,11 @@ function App() {
           <div className="topbar__actions">
             <div className="notifications">
               <button
+                type="button"
                 className="bell"
                 title={`${notifications.length} notificaciones`}
+                aria-label={`Abrir notificaciones. ${unreadCount} sin leer`}
+                aria-expanded={notificationsOpen}
                 onClick={() => setNotificationsOpen((v) => !v)}
               >
                 <span className="bell__icon" aria-hidden="true">🔔</span>
@@ -336,7 +341,7 @@ function App() {
                 <div className="notifications__panel">
                   <div className="notifications__header">
                     <span>Notificaciones</span>
-                    <button className="link" onClick={markAllRead}>Marcar todo leído</button>
+                    <button type="button" className="link" onClick={markAllRead}>Marcar todo leído</button>
                   </div>
                   {notifications.length === 0 && <div className="muted">Sin notificaciones</div>}
                   <ul>
@@ -346,7 +351,7 @@ function App() {
                         <div className="notif-body">{n.body}</div>
                         <div className="notif-meta">
                           <span>{formatDate(n.created_at)}</span>
-                          {!n.read_at && <button className="link" onClick={() => markNotificationRead(n.id)}>Marcar leído</button>}
+                          {!n.read_at && <button type="button" className="link" onClick={() => markNotificationRead(n.id)}>Marcar leído</button>}
                         </div>
                       </li>
                     ))}
@@ -588,7 +593,7 @@ function ToastViewport({ toasts, onDismiss }) {
             <div className="toast__title">{toast.type === 'success' ? 'Exito' : 'Error'}</div>
             <div className="toast__message">{toast.message}</div>
           </div>
-          <button className="toast__close" onClick={() => onDismiss(toast.id)}>×</button>
+          <button type="button" className="toast__close" aria-label="Cerrar notificación" onClick={() => onDismiss(toast.id)}>×</button>
         </div>
       ))}
     </div>
@@ -790,7 +795,7 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
         {!readonly && <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear empresa</button>}
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -813,8 +818,8 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
               <td><span className={`pill ${c.status === 'active' ? 'activa' : 'inactiva'}`}>{c.status === 'active' ? 'Activa' : 'Inactiva'}</span></td>
               {!readonly && (
                 <td className="actions">
-                  <button className="icon-btn" onClick={() => onEdit?.(c)}>✏️</button>
-                  <button className="icon-btn">🗑️</button>
+                  <button type="button" className="icon-btn" aria-label={`Editar empresa ${c.name}`} onClick={() => onEdit?.(c)}>✏️</button>
+                  <button type="button" className="icon-btn" aria-label={`Eliminar empresa ${c.name}`} disabled>🗑️</button>
                 </td>
               )}
             </tr>
@@ -835,7 +840,7 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear jefe</button>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -860,8 +865,8 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
               <td>{r.phone || '-'}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit(r)}>✏️</button>
-                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
+                <button type="button" className="icon-btn" aria-label={`Editar usuario ${r.name}`} onClick={() => onEdit(r)}>✏️</button>
+                <button type="button" className="icon-btn" aria-label={`Eliminar usuario ${r.name}`} onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -881,7 +886,7 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear administrador</button>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -901,8 +906,8 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
               <td>{r.email}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit?.(r)}>✏️</button>
-                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
+                <button type="button" className="icon-btn" aria-label={`Editar usuario ${r.name}`} onClick={() => onEdit?.(r)}>✏️</button>
+                <button type="button" className="icon-btn" aria-label={`Eliminar usuario ${r.name}`} onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -922,7 +927,7 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear supervisor</button>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -942,8 +947,8 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
               <td>{r.email}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit?.(r)}>✏️</button>
-                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
+                <button type="button" className="icon-btn" aria-label={`Editar usuario ${r.name}`} onClick={() => onEdit?.(r)}>✏️</button>
+                <button type="button" className="icon-btn" aria-label={`Eliminar usuario ${r.name}`} onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -963,7 +968,7 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear empleado</button>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -985,8 +990,8 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
               <td>{r.department || '-'}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit(r)}>✏️</button>
-                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
+                <button type="button" className="icon-btn" aria-label={`Editar usuario ${r.name}`} onClick={() => onEdit(r)}>✏️</button>
+                <button type="button" className="icon-btn" aria-label={`Eliminar usuario ${r.name}`} onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -1006,7 +1011,7 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear técnico</button>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -1028,8 +1033,8 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
               <td>{r.specialty || '-'}</td>
               <td><span className="pill activa">Activa</span></td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit(r)}>✏️</button>
-                <button className="icon-btn" onClick={() => onDelete?.(r)}>🗑️</button>
+                <button type="button" className="icon-btn" aria-label={`Editar usuario ${r.name}`} onClick={() => onEdit(r)}>✏️</button>
+                <button type="button" className="icon-btn" aria-label={`Eliminar usuario ${r.name}`} onClick={() => onDelete?.(r)}>🗑️</button>
               </td>
             </tr>
           ))}
@@ -1077,7 +1082,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
         <h3>Incidencias</h3>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -1112,8 +1117,10 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
                       <span className="assignment-status">Asignado</span>
                     ) : (
                       <button
+                        type="button"
                         className="assignment-edit"
                         title={i.assigned_to ? 'Cambiar técnico' : 'Asignar técnico'}
+                        aria-label={i.assigned_to ? `Cambiar técnico de ${i.title}` : `Asignar técnico a ${i.title}`}
                         onClick={() => {
                           setSelectedTechnicians((prev) => ({ ...prev, [i.id]: currentValue }))
                           setAssignmentModalIncidentId(i.id)
@@ -1131,8 +1138,8 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit(i.id)}>✏️</button>
-                {onDelete && <button className="icon-btn" onClick={() => onDelete(i.id)}>🗑️</button>}
+                <button type="button" className="icon-btn" aria-label={`Editar incidencia ${i.title}`} onClick={() => onEdit(i.id)}>✏️</button>
+                {onDelete && <button type="button" className="icon-btn" aria-label={`Eliminar incidencia ${i.title}`} onClick={() => onDelete(i.id)}>🗑️</button>}
               </td>
             </tr>
           )})}
@@ -1141,7 +1148,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
       <div className="panel__footer">{incidents.length} registros encontrados</div>
 
       {assignmentIncident && (
-        <div className="assignment-modal-overlay" onClick={() => {
+        <div className="assignment-modal-overlay" role="presentation" onClick={() => {
           if (pendingAssignments[assignmentIncident.id]) return
           setAssignmentModalIncidentId(null)
           setSelectedTechnicians((prev) => ({
@@ -1149,14 +1156,16 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
             [assignmentIncident.id]: assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '',
           }))
         }}>
-          <div className="assignment-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="assignment-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-modal-title" onClick={(e) => e.stopPropagation()}>
             <div className="assignment-modal__header">
               <div>
-                <h4>Asignar tecnico</h4>
+                <h4 id="assignment-modal-title">Asignar tecnico</h4>
                 <p>{assignmentIncident.title}</p>
               </div>
               <button
+                type="button"
                 className="assignment-modal__close"
+                aria-label="Cerrar asignación"
                 disabled={pendingAssignments[assignmentIncident.id]}
                 onClick={() => {
                   setAssignmentModalIncidentId(null)
@@ -1170,8 +1179,8 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
               </button>
             </div>
 
-            <label className="assignment-modal__label">Tecnico</label>
-            <select
+            <label className="assignment-modal__label" htmlFor="assignment-technician">Tecnico</label>
+            <select id="assignment-technician"
               className="assignment-modal__select"
               disabled={pendingAssignments[assignmentIncident.id]}
               value={selectedTechnicians[assignmentIncident.id] ?? (assignmentIncident.assigned_to ? String(assignmentIncident.assigned_to) : '')}
@@ -1189,6 +1198,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
 
             <div className="assignment-modal__actions">
               <button
+                type="button"
                 className="assignment-modal__secondary"
                 disabled={pendingAssignments[assignmentIncident.id]}
                 onClick={() => {
@@ -1202,6 +1212,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
                 Cancelar
               </button>
               <button
+                type="button"
                 className="btn assignment-modal__primary"
                 disabled={
                   pendingAssignments[assignmentIncident.id] ||
@@ -1228,7 +1239,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear incidencia</button>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -1250,7 +1261,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
-                <button className="icon-btn" onClick={() => onEdit(i.id)}>✏️</button>
+                <button type="button" className="icon-btn" aria-label={`Editar incidencia ${i.title}`} onClick={() => onEdit(i.id)}>✏️</button>
               </td>
             </tr>
           ))}
@@ -1273,7 +1284,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
         <h3>{title}</h3>
       </div>
       <div className="search">
-        <input placeholder="Buscar..." />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
       </div>
       <table className="table">
         <thead>
@@ -1297,8 +1308,8 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
-                {!i.assigned_to && <button className="btn btn--primary" onClick={() => onTake(i.id)}>Coger</button>}
-                {i.assigned_to === currentUserId && <button className="icon-btn" onClick={() => onManage(i.id)}>✏️</button>}
+                {!i.assigned_to && <button type="button" className="btn btn--primary" onClick={() => onTake(i.id)}>Coger</button>}
+                {i.assigned_to === currentUserId && <button type="button" className="icon-btn" aria-label={`Gestionar incidencia ${i.title}`} onClick={() => onManage(i.id)}>✏️</button>}
               </td>
             </tr>
           ))}
@@ -1323,6 +1334,7 @@ function IncidenciasAsignadas({ incidents, currentUserId, onTake, onManage }) {
 }
 
 function CrearIncidencia({ onCreate, settings, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   const [file, setFile] = useState(null)
   const categories = settings?.categories || []
@@ -1337,33 +1349,34 @@ function CrearIncidencia({ onCreate, settings, notifyError }) {
   return (
     <div className="panel form">
       <h3>Crear incidencia</h3>
-      <label>Título</label>
-      <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Describe brevemente el problema" />
-      <label>Descripción</label>
-      <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalla el problema con toda la información posible..." />
-      <label>Categoría</label>
+      <label htmlFor={`${formId}-title`}>Título</label>
+      <input id={`${formId}-title`} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Describe brevemente el problema" />
+      <label htmlFor={`${formId}-description`}>Descripción</label>
+      <textarea id={`${formId}-description`} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalla el problema con toda la información posible..." />
+      <label htmlFor={`${formId}-category`}>Categoría</label>
       {categories.length > 0 ? (
-        <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+        <select id={`${formId}-category`} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
           <option value="">Seleccionar...</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       ) : (
-        <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Redes, Software..." />
+        <input id={`${formId}-category`} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Redes, Software..." />
       )}
-      <label>Prioridad</label>
-      <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+      <label htmlFor={`${formId}-priority`}>Prioridad</label>
+      <select id={`${formId}-priority`} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
         {PRIORITY_OPTIONS.map((p) => (
           <option key={p.value} value={p.value}>{p.label}</option>
         ))}
       </select>
-      <label>Adjuntar archivo (opcional)</label>
-      <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      <label htmlFor={`${formId}-attachment`}>Adjuntar archivo (opcional)</label>
+      <input id={`${formId}-attachment`} type="file" aria-label="Adjuntar archivo" onChange={(e) => setFile(e.target.files?.[0] || null)} />
       <button className="btn btn--primary" onClick={submit}>Crear incidencia</button>
     </div>
   )
 }
 
 function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   useEffect(() => {
     if (incident) {
@@ -1392,20 +1405,21 @@ function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Editar incidencia" onBack={onBack} />
-      <label>Título</label>
-      <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-      <label>Descripción</label>
-      <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+      <label htmlFor={`${formId}-title`}>Título</label>
+      <input id={`${formId}-title`} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+      <label htmlFor={`${formId}-description`}>Descripción</label>
+      <textarea id={`${formId}-description`} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       <SuggestionInput
         label="Categoría"
         value={form.category}
         suggestions={categories}
+        id={`${formId}-category`}
         listId="incident-categories-edit"
         placeholder="Hardware, Software, Red..."
         onChange={(e) => setForm({ ...form, category: e.target.value })}
       />
-      <label>Prioridad</label>
-      <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+      <label htmlFor={`${formId}-priority`}>Prioridad</label>
+      <select id={`${formId}-priority`} value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
         <option value="low">Baja</option>
         <option value="medium">Media</option>
         <option value="high">Alta</option>
@@ -1417,6 +1431,7 @@ function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
 }
 
 function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', last_name: '', email: '', phone: '', department: '', specialty: '', password: '', active: true })
   const departments = settings?.departments || []
   const specialties = settings?.specialties || []
@@ -1463,18 +1478,19 @@ function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Editar usuario" onBack={onBack} />
-      <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      <label>Apellidos</label>
-      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      <label>Email</label>
-      <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-name`}>Nombre</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <label htmlFor={`${formId}-last-name`}>Apellidos</label>
+      <input id={`${formId}-last-name`} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
       <SuggestionInput
         label="Departamento"
         value={form.department}
         suggestions={departments}
+        id={`${formId}-department`}
         listId="edit-user-departments"
         placeholder="Desarrollo, Marketing..."
         onChange={(e) => setForm({ ...form, department: e.target.value })}
@@ -1483,14 +1499,15 @@ function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
         label="Especialidad"
         value={form.specialty}
         suggestions={specialties}
+        id={`${formId}-specialty`}
         listId="edit-user-specialties"
         placeholder="Redes, Software..."
         onChange={(e) => setForm({ ...form, specialty: e.target.value })}
       />
-      <label>Nueva contraseña (opcional)</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-      <label>Estado</label>
-      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+      <label htmlFor={`${formId}-password`}>Nueva contraseña (opcional)</label>
+      <input id={`${formId}-password`} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <label htmlFor={`${formId}-active`}>Estado</label>
+      <select id={`${formId}-active`} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
@@ -1500,6 +1517,7 @@ function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
 }
 
 function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onTakeOwnership, notifySuccess, notifyError }) {
+  const formId = useId()
   const [status, setStatus] = useState('open')
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState([])
@@ -1600,8 +1618,8 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
         )}
         {(!incident.assigned_to || incident.assigned_to === currentUserId) && (
           <>
-            <label>Cambiar estado</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <label htmlFor={`${formId}-status`}>Cambiar estado</label>
+            <select id={`${formId}-status`} value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="open">Abierta</option>
               <option value="in_progress">En proceso</option>
               <option value="resolved">Resuelta</option>
@@ -1619,7 +1637,7 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
           ))}
         </ul>
         <div className="upload-row">
-          <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+          <input id={`${formId}-upload`} type="file" aria-label="Subir adjunto" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
           <button className="btn btn--primary" onClick={uploadAttachment}>Subir</button>
         </div>
       </div>
@@ -1635,7 +1653,7 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
           </div>
         ))}
         <div className="comment__input">
-          <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Escribe un comentario..." />
+          <input id={`${formId}-comment`} value={comment} aria-label="Nuevo comentario" onChange={(e) => setComment(e.target.value)} placeholder="Escribe un comentario..." />
           <button className="btn btn--primary" onClick={addComment}>Enviar</button>
         </div>
       </div>
@@ -1691,6 +1709,7 @@ function EstadisticasEmpresa({ byTechnician }) {
 }
 
 function ConfiguracionEmpresa({ settings, onSave }) {
+  const formId = useId()
   const [form, setForm] = useState({
     primary_color: settings?.primary_color || '#2D61E5',
     secondary_color: settings?.secondary_color || '#7C3AED',
@@ -1760,13 +1779,14 @@ function ConfiguracionEmpresa({ settings, onSave }) {
               <div className="theme-preview__button">Acción principal</div>
             </div>
           </div>
-          <label>Paleta visual</label>
+          <div className="block">Paleta visual</div>
           <div className="palette-grid">
             {COLOR_PRESETS.map(([primary, secondary]) => (
               <button
                 key={`${primary}-${secondary}`}
                 type="button"
                 className={`palette-option ${form.primary_color === primary && form.secondary_color === secondary ? 'active' : ''}`}
+                aria-label={`Aplicar paleta ${primary} y ${secondary}`}
                 onClick={() => setForm({ ...form, primary_color: primary, secondary_color: secondary })}
               >
                 <span className="palette-swatch" style={{ background: primary }} />
@@ -1776,24 +1796,24 @@ function ConfiguracionEmpresa({ settings, onSave }) {
           </div>
           <div className="config-colors">
             <div>
-              <label>Color principal</label>
-              <input type="color" value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} />
+              <label htmlFor={`${formId}-primary-color`}>Color principal</label>
+              <input id={`${formId}-primary-color`} type="color" value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} />
             </div>
             <div>
-              <label>Color secundario</label>
-              <input type="color" value={form.secondary_color} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} />
+              <label htmlFor={`${formId}-secondary-color`}>Color secundario</label>
+              <input id={`${formId}-secondary-color`} type="color" value={form.secondary_color} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} />
             </div>
           </div>
-          <label>Nombre visible</label>
-          <input value={form.system_name} onChange={(e) => setForm({ ...form, system_name: e.target.value })} placeholder="TechSolutions S.L." />
-          <label>Logo de la empresa</label>
-          <input type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={(e) => {
+          <label htmlFor={`${formId}-system-name`}>Nombre visible</label>
+          <input id={`${formId}-system-name`} value={form.system_name} onChange={(e) => setForm({ ...form, system_name: e.target.value })} placeholder="TechSolutions S.L." />
+          <label htmlFor={`${formId}-logo`}>Logo de la empresa</label>
+          <input id={`${formId}-logo`} type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={(e) => {
             const file = e.target.files?.[0] || null
             setLogoFile(file)
             if (file) setLogoPreview(URL.createObjectURL(file))
           }} />
-          <label>Favicon</label>
-          <input type="file" accept=".png,.ico,.svg,.webp" onChange={(e) => {
+          <label htmlFor={`${formId}-favicon`}>Favicon</label>
+          <input id={`${formId}-favicon`} type="file" accept=".png,.ico,.svg,.webp" onChange={(e) => {
             const file = e.target.files?.[0] || null
             setFaviconFile(file)
             if (file) setFaviconPreview(URL.createObjectURL(file))
@@ -1810,8 +1830,8 @@ function ConfiguracionEmpresa({ settings, onSave }) {
         </div>
         <div className="panel">
           <div className="panel__title">Funcionalidades</div>
-          <label className="block">Modo de asignación</label>
-          <select className="block" value={form.assignment_mode} onChange={(e) => setForm({ ...form, assignment_mode: e.target.value })}>
+          <label className="block" htmlFor={`${formId}-assignment-mode`}>Modo de asignación</label>
+          <select id={`${formId}-assignment-mode`} className="block" value={form.assignment_mode} onChange={(e) => setForm({ ...form, assignment_mode: e.target.value })}>
             <option value="manual">Manual</option>
             <option value="auto">Automático</option>
             <option value="specialty">Por especialidad</option>
@@ -1821,14 +1841,14 @@ function ConfiguracionEmpresa({ settings, onSave }) {
             Automático: se asigna al técnico activo con menor carga de trabajo.
             Por especialidad: primero intenta encajar categoría y especialidad; si no hay coincidencia, cae al técnico con menor carga.
           </div>
-          <label className="block">Categorías (coma separadas)</label>
-          <input className="block" value={form.categories} onChange={(e) => setForm({ ...form, categories: e.target.value })} placeholder="Hardware, Software, Red" />
-          <label className="block">Prioridades (coma separadas)</label>
-          <input className="block" value={form.priorities} onChange={(e) => setForm({ ...form, priorities: e.target.value })} placeholder="Baja, Media, Alta, Crítica" />
-          <label className="block">Departamentos (coma separadas)</label>
-          <input className="block" value={form.departments} onChange={(e) => setForm({ ...form, departments: e.target.value })} placeholder="Desarrollo, Marketing" />
-          <label className="block">Especialidades (coma separadas)</label>
-          <input className="block" value={form.specialties} onChange={(e) => setForm({ ...form, specialties: e.target.value })} placeholder="Redes, Software" />
+          <label className="block" htmlFor={`${formId}-categories`}>Categorías (coma separadas)</label>
+          <input id={`${formId}-categories`} className="block" value={form.categories} onChange={(e) => setForm({ ...form, categories: e.target.value })} placeholder="Hardware, Software, Red" />
+          <label className="block" htmlFor={`${formId}-priorities`}>Prioridades (coma separadas)</label>
+          <input id={`${formId}-priorities`} className="block" value={form.priorities} onChange={(e) => setForm({ ...form, priorities: e.target.value })} placeholder="Baja, Media, Alta, Crítica" />
+          <label className="block" htmlFor={`${formId}-departments`}>Departamentos (coma separadas)</label>
+          <input id={`${formId}-departments`} className="block" value={form.departments} onChange={(e) => setForm({ ...form, departments: e.target.value })} placeholder="Desarrollo, Marketing" />
+          <label className="block" htmlFor={`${formId}-specialties`}>Especialidades (coma separadas)</label>
+          <input id={`${formId}-specialties`} className="block" value={form.specialties} onChange={(e) => setForm({ ...form, specialties: e.target.value })} placeholder="Redes, Software" />
         </div>
       </div>
       <div className="actions-right"><button className="btn btn--primary" onClick={handleSave}>Guardar configuración</button></div>
@@ -1837,13 +1857,13 @@ function ConfiguracionEmpresa({ settings, onSave }) {
 }
 
 
-function SuggestionInput({ label, value, onChange, placeholder, suggestions, listId }) {
+function SuggestionInput({ id, label, value, onChange, placeholder, suggestions, listId }) {
   const items = (suggestions || []).filter(Boolean)
 
   return (
     <>
-      <label>{label}</label>
-      <input value={value} list={items.length ? listId : undefined} onChange={onChange} placeholder={placeholder} />
+      <label htmlFor={id}>{label}</label>
+      <input id={id} value={value} list={items.length ? listId : undefined} onChange={onChange} placeholder={placeholder} />
       {items.length > 0 && (
         <datalist id={listId}>
           {items.map((item) => <option key={item} value={item} />)}
@@ -1886,13 +1906,14 @@ function validateIncidentForm(form) {
 function FormHeader({ title, onBack }) {
   return (
     <div className="form-header">
-      <button className="back" onClick={onBack}>←</button>
+      <button type="button" className="back" aria-label="Volver" onClick={onBack}>←</button>
       <h3>{title}</h3>
     </div>
   )
 }
 
 function CrearEmpresa({ onBack, onCreate, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', cif: '', address: '', email: '', phone: '', status: 'active' })
   const submit = () => {
     const error = validateCompanyForm(form)
@@ -1906,18 +1927,18 @@ function CrearEmpresa({ onBack, onCreate, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Crear empresa" onBack={onBack} />
-      <label>Nombre de empresa</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>CIF / Identificador</label>
-      <input value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value.toUpperCase() })} pattern={CIF_PATTERN} />
-      <label>Dirección</label>
-      <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+      <label htmlFor={`${formId}-name`}>Nombre de empresa</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-cif`}>CIF / Identificador</label>
+      <input id={`${formId}-cif`} value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value.toUpperCase() })} pattern={CIF_PATTERN} />
+      <label htmlFor={`${formId}-address`}>Dirección</label>
+      <input id={`${formId}-address`} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-status`}>Estado</label>
+      <select id={`${formId}-status`} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
         <option value="active">Activa</option>
         <option value="inactive">Inactiva</option>
       </select>
@@ -1927,6 +1948,7 @@ function CrearEmpresa({ onBack, onCreate, notifyError }) {
 }
 
 function EditarEmpresa({ company, onBack, onSave, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', cif: '', address: '', email: '', phone: '', status: 'active' })
 
   useEffect(() => {
@@ -1956,18 +1978,18 @@ function EditarEmpresa({ company, onBack, onSave, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Editar empresa" onBack={onBack} />
-      <label>Nombre de empresa</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>CIF / Identificador</label>
-      <input value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value.toUpperCase() })} pattern={CIF_PATTERN} />
-      <label>Dirección</label>
-      <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+      <label htmlFor={`${formId}-name`}>Nombre de empresa</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-cif`}>CIF / Identificador</label>
+      <input id={`${formId}-cif`} value={form.cif} onChange={(e) => setForm({ ...form, cif: e.target.value.toUpperCase() })} pattern={CIF_PATTERN} />
+      <label htmlFor={`${formId}-address`}>Dirección</label>
+      <input id={`${formId}-address`} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-status`}>Estado</label>
+      <select id={`${formId}-status`} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
         <option value="active">Activa</option>
         <option value="inactive">Inactiva</option>
       </select>
@@ -1977,6 +1999,7 @@ function EditarEmpresa({ company, onBack, onSave, notifyError }) {
 }
 
 function CrearJefe({ onBack, onCreate, companies, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', company_id: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form, { requireCompany: true })
@@ -1990,23 +2013,23 @@ function CrearJefe({ onBack, onCreate, companies, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Crear jefe de empresa" onBack={onBack} />
-      <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>Apellidos</label>
-      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-      <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-      <label>Empresa asignada</label>
-      <select value={form.company_id} onChange={(e) => setForm({ ...form, company_id: Number(e.target.value) })}>
+      <label htmlFor={`${formId}-name`}>Nombre</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-last-name`}>Apellidos</label>
+      <input id={`${formId}-last-name`} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <label htmlFor={`${formId}-password`}>Contraseña</label>
+      <input id={`${formId}-password`} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label htmlFor={`${formId}-company`}>Empresa asignada</label>
+      <select id={`${formId}-company`} value={form.company_id} onChange={(e) => setForm({ ...form, company_id: Number(e.target.value) })}>
         <option value="">Seleccionar...</option>
         {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-active`}>Estado</label>
+      <select id={`${formId}-active`} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
@@ -2016,6 +2039,7 @@ function CrearJefe({ onBack, onCreate, companies, notifyError }) {
 }
 
 function CrearAdmin({ onBack, onCreate, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form)
@@ -2029,18 +2053,18 @@ function CrearAdmin({ onBack, onCreate, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Crear administrador" onBack={onBack} />
-      <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>Apellidos</label>
-      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-      <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+      <label htmlFor={`${formId}-name`}>Nombre</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-last-name`}>Apellidos</label>
+      <input id={`${formId}-last-name`} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <label htmlFor={`${formId}-password`}>Contraseña</label>
+      <input id={`${formId}-password`} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-active`}>Estado</label>
+      <select id={`${formId}-active`} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
@@ -2050,6 +2074,7 @@ function CrearAdmin({ onBack, onCreate, notifyError }) {
 }
 
 function CrearSupervisor({ onBack, onCreate, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', phone: '', active: true })
   const submit = () => {
     const error = validateUserForm(form)
@@ -2063,18 +2088,18 @@ function CrearSupervisor({ onBack, onCreate, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Crear supervisor" onBack={onBack} />
-      <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>Apellidos</label>
-      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-      <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+      <label htmlFor={`${formId}-name`}>Nombre</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-last-name`}>Apellidos</label>
+      <input id={`${formId}-last-name`} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <label htmlFor={`${formId}-password`}>Contraseña</label>
+      <input id={`${formId}-password`} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-active`}>Estado</label>
+      <select id={`${formId}-active`} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
@@ -2084,6 +2109,7 @@ function CrearSupervisor({ onBack, onCreate, notifyError }) {
 }
 
 function CrearEmpleado({ onBack, onCreate, settings, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', department: '', phone: '', active: true })
   const departments = settings?.departments || []
   const submit = () => {
@@ -2098,15 +2124,16 @@ function CrearEmpleado({ onBack, onCreate, settings, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Crear empleado" onBack={onBack} />
-      <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>Apellidos</label>
-      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-      <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label htmlFor={`${formId}-name`}>Nombre</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-last-name`}>Apellidos</label>
+      <input id={`${formId}-last-name`} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <label htmlFor={`${formId}-password`}>Contraseña</label>
+      <input id={`${formId}-password`} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
       <SuggestionInput
+        id={`${formId}-department`}
         label="Departamento (opcional)"
         value={form.department}
         suggestions={departments}
@@ -2114,10 +2141,10 @@ function CrearEmpleado({ onBack, onCreate, settings, notifyError }) {
         placeholder="Desarrollo, Marketing..."
         onChange={(e) => setForm({ ...form, department: e.target.value })}
       />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-active`}>Estado</label>
+      <select id={`${formId}-active`} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
@@ -2127,6 +2154,7 @@ function CrearEmpleado({ onBack, onCreate, settings, notifyError }) {
 }
 
 function CrearTecnico({ onBack, onCreate, settings, notifyError }) {
+  const formId = useId()
   const [form, setForm] = useState({ name: '', last_name: '', email: '', password: '', specialty: '', phone: '', active: true })
   const specialties = settings?.specialties || []
   const submit = () => {
@@ -2141,15 +2169,16 @@ function CrearTecnico({ onBack, onCreate, settings, notifyError }) {
   return (
     <div className="panel form">
       <FormHeader title="Crear técnico" onBack={onBack} />
-      <label>Nombre</label>
-      <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-      <label>Apellidos</label>
-      <input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-      <label>Email</label>
-      <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-      <label>Contraseña</label>
-      <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+      <label htmlFor={`${formId}-name`}>Nombre</label>
+      <input id={`${formId}-name`} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+      <label htmlFor={`${formId}-last-name`}>Apellidos</label>
+      <input id={`${formId}-last-name`} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+      <label htmlFor={`${formId}-email`}>Email</label>
+      <input id={`${formId}-email`} type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+      <label htmlFor={`${formId}-password`}>Contraseña</label>
+      <input id={`${formId}-password`} type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
       <SuggestionInput
+        id={`${formId}-specialty`}
         label="Especialidad (opcional)"
         value={form.specialty}
         suggestions={specialties}
@@ -2157,10 +2186,10 @@ function CrearTecnico({ onBack, onCreate, settings, notifyError }) {
         placeholder="Redes, Software..."
         onChange={(e) => setForm({ ...form, specialty: e.target.value })}
       />
-      <label>Teléfono</label>
-      <input type="tel" inputMode="tel" pattern={PHONE_PATTERN} value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
-      <label>Estado</label>
-      <select value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
+      <label htmlFor={`${formId}-phone`}>Teléfono</label>
+      <input id={`${formId}-phone`} type="tel" inputMode="tel" pattern={PHONE_PATTERN} autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizePhone(e.target.value) })} />
+      <label htmlFor={`${formId}-active`}>Estado</label>
+      <select id={`${formId}-active`} value={form.active ? '1' : '0'} onChange={(e) => setForm({ ...form, active: e.target.value === '1' })}>
         <option value="1">Activo</option>
         <option value="0">Inactivo</option>
       </select>
