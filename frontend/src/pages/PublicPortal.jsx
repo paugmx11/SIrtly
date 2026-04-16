@@ -64,7 +64,6 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
         <nav className="landing__nav-links">
           <button className="landing__nav-link" onClick={() => scrollTo('ventajas')}>Ventajas</button>
           <button className="landing__nav-link" onClick={() => scrollTo('contacto')}>Contacto</button>
-          <button className="landing__nav-link" onClick={onGoLogin}>Acceso clientes</button>
           <button className="btn btn--primary landing__nav-cta" onClick={onGoLogin}>Iniciar sesión</button>
         </nav>
       </header>
@@ -94,7 +93,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
                 <span>Entornos separados para cada compañía</span>
               </article>
               <article>
-                <strong>Branding propio</strong>
+                <strong>Identidad visual</strong>
                 <span>Logo, colores y configuración adaptados a cada empresa</span>
               </article>
             </div>
@@ -159,7 +158,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
                         <span style={{ background: '#2D61E5' }} />
                         <span style={{ background: '#1D4ED8' }} />
                         <span style={{ background: '#3B82F6' }} />
-                        <span style={{ background: '#60A5FA' }} />
+                        <span style={{ background: '#22C55E' }} />
                       </div>
                     </div>
                   </div>
@@ -173,12 +172,15 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
                 Diseñado para empresas que quieren un portal de incidencias moderno, visualmente adaptable
                 y fácil de usar tanto para equipos internos como para responsables de gestión.
               </p>
+              <p>
+                La idea es simple: que la gestión diaria se sienta ordenada, rápida y coherente con la imagen de cada empresa.
+              </p>
             </article>
           </div>
         </section>
 
         <section className="landing__section" id="ventajas">
-          <div className="landing__section-head">
+          <div className="landing__section-head landing__section-head--wide">
             <div className="landing__eyebrow landing__eyebrow--dark">Qué hace diferente a Sirtly</div>
             <h2>Una plataforma de incidencias pensada para empresas que quieren control, personalización y una experiencia cuidada.</h2>
           </div>
@@ -261,26 +263,14 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
           <div className="landing__section-head">
             <div className="landing__eyebrow landing__eyebrow--dark">Contacto</div>
             <h2>Si quieres hablar con nosotros sobre Sirtly, déjanos tus datos y tu mensaje.</h2>
+            <div className="landing__contact-intro">
+              <div className="landing__contact-intro-tag">Proyecto de 2º DAW</div>
+              <p>Una propuesta desarrollada en 2º DAW con foco en experiencia de usuario, arquitectura clara y un producto que destaque visual y funcionalmente.</p>
+              <p>Podéis escribirnos para conocer mejor el producto, resolver dudas sobre el flujo de roles y la personalización, proponer mejoras o abrir una conversación directa con nosotros.</p>
+            </div>
           </div>
 
           <div className="landing__contact-grid">
-            <div className="landing__contact-copy">
-              <div className="landing__contact-card">
-                <h3>Para qué puedes escribirnos</h3>
-                <ul>
-                  <li>Conocer mejor el producto y su enfoque multiempresa</li>
-                  <li>Resolver dudas sobre el flujo de roles y la personalización</li>
-                  <li>Comentar mejoras, ideas o colaboración en el proyecto</li>
-                  <li>Solicitar una conversación directa con Mauro y Pau</li>
-                </ul>
-              </div>
-
-              <div className="landing__contact-card landing__contact-card--accent">
-                <h3>Proyecto creado por Mauro y Pau</h3>
-                <p>Una propuesta desarrollada en DAW con foco en experiencia de usuario, arquitectura clara y un producto que destaque visual y funcionalmente.</p>
-              </div>
-            </div>
-
             <form className="landing__contact-form" onSubmit={submitContact}>
               <label>Nombre</label>
               <input value={contactForm.name} onChange={(e) => updateField('name', e.target.value)} placeholder="Tu nombre" />
@@ -301,9 +291,65 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
 
               <button className="btn btn--primary landing__contact-submit" type="submit">Enviar mensaje</button>
             </form>
+
+            <aside className="landing__contact-side">
+              <article className="landing__contact-panel landing__contact-panel--accent">
+                <h3>Hablemos con contexto</h3>
+                <p>Cuéntanos brevemente qué te interesa de Sirtly y podremos responderte con una conversación mucho más útil.</p>
+              </article>
+
+              <article className="landing__contact-panel">
+                <h4>Qué puedes comentarnos</h4>
+                <ul>
+                  <li>Cómo encajaría Sirtly en una empresa real</li>
+                  <li>Dudas sobre roles, asignaciones y personalización</li>
+                  <li>Mejoras, feedback o ideas de evolución del producto</li>
+                </ul>
+              </article>
+
+              <article className="landing__contact-panel landing__contact-panel--compact">
+                <span className="landing__contact-kicker">Equipo</span>
+                <strong>Estudiantes de 2º DAW</strong>
+                <p>Proyecto orientado a producto real, diseño cuidado y arquitectura clara.</p>
+              </article>
+            </aside>
           </div>
         </section>
       </main>
+
+      <footer className="landing__footer">
+        <div className="landing__footer-shell">
+          <div className="landing__footer-brand">
+            <PublicBrandLogo brandName="Sirtly" product />
+            <div>
+              <div className="landing__footer-title">Sirtly</div>
+              <p>Portal de incidencias multiempresa con foco en claridad, personalización y una experiencia profesional.</p>
+            </div>
+          </div>
+
+          <div className="landing__footer-links">
+            <div>
+              <span className="landing__footer-heading">Producto</span>
+              <button type="button" onClick={() => scrollTo('ventajas')}>Ventajas</button>
+              <button type="button" onClick={() => scrollTo('contacto')}>Contacto</button>
+            </div>
+            <div>
+              <span className="landing__footer-heading">Portal</span>
+              <button type="button" onClick={onGoLogin}>Iniciar sesión</button>
+              <button type="button" onClick={() => scrollTo('contacto')}>Escríbenos</button>
+            </div>
+            <div>
+              <span className="landing__footer-heading">Proyecto</span>
+              <p>Desarrollado como propuesta diferencial dentro de 2º DAW.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="landing__footer-bottom">
+          <span>© 2026 Sirtly. Todos los derechos reservados.</span>
+          <span>Diseñado para presentar una solución real, visual y escalable.</span>
+        </div>
+      </footer>
     </div>
   )
 }
@@ -342,7 +388,6 @@ function LoginScreen({ onSubmit, onBack }) {
         <div className="login__stage">
           <div className="login__card">
             <div className="login__card-top">
-              <div className="login__eyebrow">Acceso seguro</div>
               <button className="login__back" type="button" onClick={onBack}>Volver al inicio</button>
             </div>
             <h1>Iniciar sesión</h1>

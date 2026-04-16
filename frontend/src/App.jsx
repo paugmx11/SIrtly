@@ -1110,7 +1110,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
               <td className="assignment-cell">
-                {assignmentMode === 'manual' && onAssign ? (
+                {onAssign ? (
                   <div className="assignment-display">
                     <span className={`assignment-display__name ${!i.assigned_to ? 'is-unassigned' : ''}`}>{assigneeName}</span>
                     {isConfirmed ? (
