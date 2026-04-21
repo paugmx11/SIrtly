@@ -31,6 +31,7 @@
 - Node.js 20+
 - npm 10+
 - MySQL 8.x compatible server
+- Docker Engine / Docker Desktop with `docker compose`
 
 ## Project Structure
 ```text
@@ -267,7 +268,7 @@ Important:
 - If a teammate pulls the project for the first time, they must create their own `backend/.env` based on these values
 
 ## Docker Setup
-The project is prepared to run locally and in deployment-oriented environments using Docker.
+The project is prepared to run locally and in deployment-oriented environments using Docker. This is the current recommended way to start the full stack because it keeps backend, frontend, and database aligned in one reproducible setup.
 
 Main files:
 - `frontend/Dockerfile`
@@ -275,16 +276,31 @@ Main files:
 - `database/Dockerfile`
 - `docker-compose.yml`
 
+Container architecture:
+- `db`: MySQL 8 container initialized from the root `.sql` file
+- `backend`: Laravel API served with Apache and connected to the internal MySQL container
+- `frontend`: React application built with Vite and served through Nginx
+- `backend_storage` volume: persists Laravel storage data such as uploaded files
+- `db_data` volume: persists MySQL data between container restarts
+
 Default local Docker URLs:
 - Frontend: `http://localhost:8080`
 - Backend API: `http://localhost:8000/api`
 - Backend root: `http://localhost:8000`
 
-Run locally with Docker:
+Run locally with Docker from the project root:
 
 ```bash
-docker compose build
-docker compose up
+docker compose up --build -d
+```
+
+Useful Docker commands:
+
+```bash
+docker compose ps
+docker compose logs -f
+docker compose down
+docker compose up -d
 ```
 
 Important notes:
@@ -293,10 +309,11 @@ Important notes:
 - The MySQL service is internal only and is not exposed publicly in the default Docker setup
 - File uploads and branding assets are persisted through the backend storage volume
 - The root `.sql` file is loaded by the database container on first initialization
+- If the database volume already exists, changes in `.sql` will not be re-imported automatically unless the volume is recreated
 - Most API endpoints require a Bearer token and should be tested with Postman, Insomnia, curl, or the frontend itself
 
 ## Manual Development Setup
-If Docker is not being used, developers can still run the project manually.
+Before the Docker setup was added, the project was usually started manually with `php artisan` for the backend and `npm run dev` for the frontend. That workflow is still available if Docker is not being used.
 
 Import the SQL schema and demo data first, then use:
 
@@ -309,6 +326,8 @@ php artisan key:generate
 php artisan storage:link
 php artisan serve
 ```
+
+The manual backend flow is useful if you want to run Laravel directly on your machine, but for the shared project setup the Docker flow above is the preferred option.
 
 Frontend:
 
