@@ -131,6 +131,24 @@
   cursor: pointer;
 }
 
+.sidebar__licenses {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 8px 0;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.sidebar__licenses a {
+  color: #cbd5e1;
+  text-decoration: none;
+}
+
+.sidebar__licenses a:hover {
+  text-decoration: underline;
+}
+
 .content {
   display: flex;
   flex-direction: column;
@@ -435,6 +453,10 @@
   color: rgba(226, 232, 240, 0.8);
   font-size: 10px;
   margin-top: 18px;
+}
+
+.login__footer a {
+  color: #cbd5e1;
 }
 
 @media (max-width: 980px) {
