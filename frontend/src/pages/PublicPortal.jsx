@@ -2,6 +2,9 @@ import { useState } from 'react'
 import './PublicPortal.css'
 import sirtlyLogo from '../assets/Logo Sirtly.png'
 
+const LICENSE_SOURCE_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE'
+const LICENSE_ASSETS_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE-ASSETS.md'
+
 export default function PublicPortal({ onLogin, onContactSubmit, notifyError }) {
   const [publicView, setPublicView] = useState('welcome')
 
@@ -347,6 +350,11 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
 
         <div className="landing__footer-bottom">
           <span>© 2026 Sirtly. Todos los derechos reservados.</span>
+          <span className="landing__license-links">
+            <a href={LICENSE_SOURCE_URL} target="_blank" rel="noopener noreferrer">MIT (código)</a>
+            {' · '}
+            <a href={LICENSE_ASSETS_URL} target="_blank" rel="noopener noreferrer">CC BY-NC 4.0 (documentación/assets)</a>
+          </span>
           <span>Diseñado para presentar una solución real, visual y escalable.</span>
         </div>
       </footer>
@@ -382,7 +390,13 @@ function LoginScreen({ onSubmit, onBack }) {
             </ul>
           </div>
 
-          <div className="login__footer">© 2026 Sirtly. Todos los derechos reservados.</div>
+          <div className="login__footer">
+            © 2026 Sirtly. Todos los derechos reservados.
+            {' '}
+            <a href={LICENSE_SOURCE_URL} target="_blank" rel="noopener noreferrer">MIT</a>
+            {' · '}
+            <a href={LICENSE_ASSETS_URL} target="_blank" rel="noopener noreferrer">CC BY-NC 4.0</a>
+          </div>
         </div>
 
         <div className="login__stage">

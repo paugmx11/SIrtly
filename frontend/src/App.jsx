@@ -56,6 +56,8 @@ const TECNICO_MENU = [
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api').replace(/\/$/, '')
 const API_ROOT = API_BASE.replace('/api', '')
+const LICENSE_SOURCE_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE'
+const LICENSE_ASSETS_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE-ASSETS.md'
 const PHONE_PATTERN = '^\\+?[0-9\\s()\\-]{7,20}$'
 const CIF_PATTERN = '^[A-Za-z0-9\\-]{5,20}$'
 const COLOR_PRESETS = [
@@ -319,6 +321,11 @@ function App() {
           })
           setToken('')
         }}>Cerrar sesión</button>
+        <div className="sidebar__licenses" aria-label="Licencias del proyecto">
+          <span>Licencias:</span>
+          <a href={LICENSE_SOURCE_URL} target="_blank" rel="noopener noreferrer">MIT (código)</a>
+          <a href={LICENSE_ASSETS_URL} target="_blank" rel="noopener noreferrer">CC BY-NC 4.0 (documentación/assets)</a>
+        </div>
       </aside>
 
       <div className="content">
