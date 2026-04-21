@@ -145,6 +145,25 @@ There is no public registration flow.
 - The backend returns the authenticated user and their role.
 - The frontend uses that role to load the correct dashboard automatically.
 
+## Security Model (Auth and Roles)
+The project currently separates security into two practical layers:
+
+Domain authorization logic (who can do what):
+- Access control is role-based (`admin`, `supervisor`, `jefe_empresa`, `tecnico`, `empleado`).
+- Authorization is enforced in API controller logic using role checks and company scope (`company_id`).
+- Multi-company isolation is applied by filtering data and actions to the authenticated user's company when required.
+
+Infrastructure mechanism (how access is enforced):
+- API authentication uses Laravel Sanctum personal access tokens for REST requests.
+- Login issues a token (`POST /api/auth/login`) and protected routes require `auth:sanctum`.
+- Clients call protected endpoints with `Authorization: Bearer <token>`.
+- Logout invalidates the current token (`POST /api/auth/logout`).
+
+What is not used in the current implementation:
+- JWT authentication is not implemented.
+- OAuth/OAuth2 flows are not implemented.
+- Laravel session auth exists in framework defaults but is not the primary mechanism for the API.
+
 ## Main API Endpoints
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
