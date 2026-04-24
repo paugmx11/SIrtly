@@ -74,6 +74,7 @@ function App() {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState('admin')
   const [view, setView] = useState('admin-dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedIncidentId, setSelectedIncidentId] = useState(null)
   const [selectedUser, setSelectedUser] = useState(null)
   const [selectedUserSource, setSelectedUserSource] = useState(null)
@@ -236,6 +237,10 @@ function App() {
     }
   }, [token, role])
 
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [view, token, role])
+
   if (!token) {
     return (
       <PublicPortal
@@ -273,7 +278,7 @@ function App() {
 
   return (
     <div className="app" style={{ '--brand-primary': brandPrimary, '--brand-secondary': brandSecondary }}>
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar__brand">
           <BrandLogo brandLogo={brandLogo} brandName={brandName} product={!brandLogo && brandName === 'Sirtly'} />
           <div>
@@ -327,10 +332,24 @@ function App() {
           <a href={LICENSE_ASSETS_URL} target="_blank" rel="noopener noreferrer">CC BY-NC 4.0 (documentación/assets)</a>
         </div>
       </aside>
+      {sidebarOpen && <button type="button" className="sidebar-overlay" aria-label="Cerrar menú lateral" onClick={() => setSidebarOpen(false)} />}
 
       <div className="content">
         <header className="topbar">
-          <div className="topbar__title">{resolveTitle(view)}</div>
+          <div className="topbar__leading">
+            <button
+              type="button"
+              className="hamburger"
+              aria-label="Abrir menú"
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen((prev) => !prev)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+            <div className="topbar__title">{resolveTitle(view)}</div>
+          </div>
           <div className="topbar__actions">
             <div className="notifications">
               <button
@@ -639,7 +658,7 @@ function RecentTable({ rows, personLabel = 'Técnico' }) {
   return (
     <div className="panel">
       <div className="panel__title">Actividad reciente</div>
-      <table className="table">
+      <table className="table recent-table">
         <thead>
           <tr>
             <th>Título</th>
@@ -652,11 +671,11 @@ function RecentTable({ rows, personLabel = 'Técnico' }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.title}>
-              <td>{r.title}</td>
-              <td>{r.person}</td>
-              <td><span className={`pill ${r.priorityClass}`}>{r.priority}</span></td>
-              <td><span className={`pill ${r.statusClass}`}>{r.status}</span></td>
-              <td>{r.date}</td>
+              <td data-label="Título">{r.title}</td>
+              <td data-label={personLabel}>{r.person}</td>
+              <td data-label="Prioridad"><span className={`pill ${r.priorityClass}`}>{r.priority}</span></td>
+              <td data-label="Estado"><span className={`pill ${r.statusClass}`}>{r.status}</span></td>
+              <td data-label="Fecha">{r.date}</td>
             </tr>
           ))}
         </tbody>
