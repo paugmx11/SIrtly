@@ -81,6 +81,14 @@ function App() {
   const [selectedCompany, setSelectedCompany] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    new_password: '',
+    new_password_confirmation: '',
+  })
   const [toasts, setToasts] = useState([])
 
   const [data, setData] = useState({
@@ -239,7 +247,86 @@ function App() {
 
   useEffect(() => {
     setSidebarOpen(false)
+    setNotificationsOpen(false)
+    setProfileMenuOpen(false)
   }, [view, token, role])
+
+  const resetSession = () => {
+    setUser(null)
+    setRole('admin')
+    setView('admin-dashboard')
+    setData({
+      companies: [],
+      users: [],
+      incidents: [],
+      statsSystem: null,
+      statsCompany: null,
+      byCompany: [],
+      byTechnician: [],
+      settings: null,
+      comments: [],
+      attachments: [],
+    })
+    setToken('')
+  }
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' })
+    } catch {
+      // Ignore logout errors and close the local session anyway.
+    }
+    setProfileMenuOpen(false)
+    setPasswordModalOpen(false)
+    resetSession()
+  }
+
+  const handlePasswordChange = (key, value) => {
+    setPasswordForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const closePasswordModal = () => {
+    setPasswordModalOpen(false)
+    setPasswordForm({
+      current_password: '',
+      new_password: '',
+      new_password_confirmation: '',
+    })
+  }
+
+  const submitPasswordChange = async (e) => {
+    e.preventDefault()
+
+    if (!passwordForm.current_password || !passwordForm.new_password || !passwordForm.new_password_confirmation) {
+      notifyError('Completa todos los campos para actualizar la contraseña')
+      return
+    }
+
+    if (passwordForm.new_password.length < 8) {
+      notifyError('La nueva contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
+    if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
+      notifyError('La confirmación de contraseña no coincide')
+      return
+    }
+
+    setPasswordSaving(true)
+    try {
+      await apiFetch('/users/me/password', {
+        method: 'PATCH',
+        body: JSON.stringify(passwordForm),
+      })
+      notifySuccess('Contraseña actualizada correctamente')
+      closePasswordModal()
+      setProfileMenuOpen(false)
+    } catch (error) {
+      notifyError(error.message || 'No se pudo actualizar la contraseña')
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
 
   if (!token) {
     return (
@@ -307,25 +394,6 @@ function App() {
             <div className="profile-role">{ROLE_LABELS[role]}</div>
           </div>
         </div>
-        <button type="button" className="logout" onClick={async () => {
-          try { await apiFetch('/auth/logout', { method: 'POST' }) } catch { }
-          setUser(null)
-          setRole('admin')
-          setView('admin-dashboard')
-          setData({
-            companies: [],
-            users: [],
-            incidents: [],
-            statsSystem: null,
-            statsCompany: null,
-            byCompany: [],
-            byTechnician: [],
-            settings: null,
-            comments: [],
-            attachments: [],
-          })
-          setToken('')
-        }}>Cerrar sesión</button>
         <div className="sidebar__licenses" aria-label="Licencias del proyecto">
           <span>Licencias:</span>
           <a href={LICENSE_SOURCE_URL} target="_blank" rel="noopener noreferrer">MIT (código)</a>
@@ -358,7 +426,10 @@ function App() {
                 title={`${notifications.length} notificaciones`}
                 aria-label={`Abrir notificaciones. ${unreadCount} sin leer`}
                 aria-expanded={notificationsOpen}
-                onClick={() => setNotificationsOpen((v) => !v)}
+                onClick={() => {
+                  setNotificationsOpen((v) => !v)
+                  setProfileMenuOpen(false)
+                }}
               >
                 <span className="bell__icon" aria-hidden="true">🔔</span>
                 {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
@@ -385,9 +456,49 @@ function App() {
                 </div>
               )}
             </div>
-            <div className="profile">
-              <div className="avatar">{profileName[0]}</div>
-              <span>{profileName}</span>
+            <div className="profile-menu">
+              <button
+                type="button"
+                className="profile-menu__trigger"
+                aria-haspopup="menu"
+                aria-expanded={profileMenuOpen}
+                onClick={() => {
+                  setProfileMenuOpen((prev) => !prev)
+                  setNotificationsOpen(false)
+                }}
+              >
+                <div className="avatar">{profileName[0]}</div>
+                <div className="profile-menu__summary">
+                  <span className="profile-menu__name">{profileName}</span>
+                  <span className="profile-menu__role">{ROLE_LABELS[role]}</span>
+                </div>
+                <span className="profile-menu__chevron" aria-hidden="true">▾</span>
+              </button>
+              {profileMenuOpen && (
+                <>
+                  <button type="button" className="profile-menu__overlay" aria-label="Cerrar menú de perfil" onClick={() => setProfileMenuOpen(false)} />
+                  <div className="profile-menu__panel" role="menu" aria-label="Opciones de perfil">
+                    <div className="profile-menu__panel-header">
+                      <strong>{profileName}</strong>
+                      <span>{ROLE_LABELS[role]}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="profile-menu__item"
+                      role="menuitem"
+                      onClick={() => {
+                        setPasswordModalOpen(true)
+                        setProfileMenuOpen(false)
+                      }}
+                    >
+                      Cambiar contraseña
+                    </button>
+                    <button type="button" className="profile-menu__item profile-menu__item--danger" role="menuitem" onClick={handleLogout}>
+                      Cerrar sesión
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -414,6 +525,68 @@ function App() {
             notifyError,
           })}
         </main>
+        {passwordModalOpen && (
+          <div className="assignment-modal-overlay" role="presentation" onClick={closePasswordModal}>
+            <div className="assignment-modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title" onClick={(e) => e.stopPropagation()}>
+              <div className="assignment-modal__header">
+                <div>
+                  <h4 id="password-modal-title">Cambiar contraseña</h4>
+                  <p>Actualiza tu contraseña para mejorar la seguridad de tu cuenta.</p>
+                </div>
+                <button
+                  type="button"
+                  className="assignment-modal__close"
+                  aria-label="Cerrar diálogo"
+                  onClick={closePasswordModal}
+                  disabled={passwordSaving}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={submitPasswordChange}>
+                <label className="assignment-modal__label" htmlFor="current-password">Contraseña actual</label>
+                <input
+                  id="current-password"
+                  className="assignment-modal__input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwordForm.current_password}
+                  onChange={(e) => handlePasswordChange('current_password', e.target.value)}
+                />
+
+                <label className="assignment-modal__label" htmlFor="new-password">Nueva contraseña</label>
+                <input
+                  id="new-password"
+                  className="assignment-modal__input"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.new_password}
+                  onChange={(e) => handlePasswordChange('new_password', e.target.value)}
+                />
+
+                <label className="assignment-modal__label" htmlFor="new-password-confirmation">Confirmar nueva contraseña</label>
+                <input
+                  id="new-password-confirmation"
+                  className="assignment-modal__input"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.new_password_confirmation}
+                  onChange={(e) => handlePasswordChange('new_password_confirmation', e.target.value)}
+                />
+
+                <div className="assignment-modal__actions">
+                  <button type="button" className="assignment-modal__secondary" onClick={closePasswordModal} disabled={passwordSaving}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn assignment-modal__primary" disabled={passwordSaving}>
+                    {passwordSaving ? 'Guardando...' : 'Actualizar contraseña'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

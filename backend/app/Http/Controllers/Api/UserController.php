@@ -13,6 +13,37 @@ class UserController extends Controller
 {
     private const PHONE_REGEX = '/^\+?[0-9\s()\-]{7,20}$/';
 
+    public function updateOwnPassword(Request $request)
+    {
+        $auth = $request->user();
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [], [
+            'new_password' => 'nueva contraseña',
+        ]);
+
+        if (!Hash::check($validated['current_password'], $auth->password)) {
+            return response()->json([
+                'message' => 'La contraseña actual no es correcta.',
+                'errors' => ['current_password' => ['La contraseña actual no es correcta.']],
+            ], 422);
+        }
+
+        if (Hash::check($validated['new_password'], $auth->password)) {
+            return response()->json([
+                'message' => 'La nueva contraseña debe ser diferente a la actual.',
+                'errors' => ['new_password' => ['La nueva contraseña debe ser diferente a la actual.']],
+            ], 422);
+        }
+
+        $auth->password = Hash::make($validated['new_password']);
+        $auth->save();
+
+        return response()->json(['message' => 'Password updated.']);
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
