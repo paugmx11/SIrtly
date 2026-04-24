@@ -7,10 +7,20 @@ const LICENSE_ASSETS_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE
 
 export default function PublicPortal({ onLogin, onContactSubmit, notifyError }) {
   const [publicView, setPublicView] = useState('welcome')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return publicView === 'login'
     ? <LoginScreen onBack={() => setPublicView('welcome')} onSubmit={onLogin} />
-    : <WelcomePage onGoLogin={() => setPublicView('login')} onContactSubmit={onContactSubmit} notifyError={notifyError} />
+    : <WelcomePage
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        onGoLogin={() => {
+          setMenuOpen(false)
+          setPublicView('login')
+        }}
+        onContactSubmit={onContactSubmit}
+        notifyError={notifyError}
+      />
 }
 
 function PublicBrandLogo({ brandName, brandLogo, product = false }) {
@@ -25,7 +35,7 @@ function PublicBrandLogo({ brandName, brandLogo, product = false }) {
   return <div className="logo">{(brandName || 'S').trim().charAt(0).toUpperCase() || 'S'}</div>
 }
 
-function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
+function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMenuOpen }) {
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -51,6 +61,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
 
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setMenuOpen(false)
   }
 
   return (
@@ -69,7 +80,28 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError }) {
           <button className="landing__nav-link" onClick={() => scrollTo('contacto')}>Contacto</button>
           <button className="btn btn--primary landing__nav-cta" onClick={onGoLogin}>Iniciar sesión</button>
         </nav>
+        <button
+          type="button"
+          className="landing__menu-toggle"
+          aria-label="Abrir menú"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
       </header>
+      {menuOpen && (
+        <>
+          <button type="button" className="landing__menu-overlay" aria-label="Cerrar menú" onClick={() => setMenuOpen(false)} />
+          <div className="landing__mobile-menu">
+            <button className="landing__mobile-link" onClick={() => scrollTo('ventajas')}>Ventajas</button>
+            <button className="landing__mobile-link" onClick={() => scrollTo('contacto')}>Contacto</button>
+            <button className="btn btn--primary landing__mobile-cta" onClick={onGoLogin}>Iniciar sesión</button>
+          </div>
+        </>
+      )}
 
       <main className="landing__main">
         <section className="landing__hero">
