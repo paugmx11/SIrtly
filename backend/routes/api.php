@@ -42,9 +42,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/incidents/{id}/attachments', [AttachmentController::class, 'index']);
     Route::post('/incidents/{id}/attachments', [AttachmentController::class, 'store']);
+    Route::delete('/incidents/{incidentId}/attachments/{attachmentId}', [AttachmentController::class, 'destroy']);
+    Route::post('/incidents/{incidentId}/attachments/{attachmentId}', [AttachmentController::class, 'destroy']);
+    Route::post('/incidents/{incidentId}/attachments/{attachmentId}/delete', [AttachmentController::class, 'destroy']);
 
     Route::get('/company-settings', [CompanySettingsController::class, 'show']);
     Route::put('/company-settings', [CompanySettingsController::class, 'update']);
+    Route::post('/company-settings', [CompanySettingsController::class, 'update']);
 
     Route::get('/stats/system', [StatsController::class, 'system']);
     Route::get('/stats/company', [StatsController::class, 'company']);
