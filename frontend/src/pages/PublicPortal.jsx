@@ -1,13 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './PublicPortal.css'
 import sirtlyLogo from '../assets/Logo Sirtly.png'
 
 const LICENSE_SOURCE_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE'
 const LICENSE_ASSETS_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE-ASSETS.md'
 
-export default function PublicPortal({ onLogin, onContactSubmit, notifyError }) {
-  const [publicView, setPublicView] = useState('welcome')
+export default function PublicPortal({ onLogin, onContactSubmit, notifyError, initialView = 'welcome', onPublicViewChange }) {
+  const [publicView, setPublicView] = useState(initialView)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    setPublicView(initialView)
+  }, [initialView])
+
+  useEffect(() => {
+    onPublicViewChange?.(publicView)
+  }, [onPublicViewChange, publicView])
 
   return publicView === 'login'
     ? <LoginScreen onBack={() => setPublicView('welcome')} onSubmit={onLogin} />
@@ -438,7 +446,7 @@ function LoginScreen({ onSubmit, onBack }) {
             </div>
             <h1>Iniciar sesión</h1>
             <p>Accede a tu panel de gestión</p>
-            <form onSubmit={onSubmit}>
+            <form noValidate onSubmit={onSubmit}>
               <label>Email</label>
               <input name="email" type="email" placeholder="tu@empresa.com" />
               <label>Contraseña</label>

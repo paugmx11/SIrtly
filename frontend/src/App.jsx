@@ -68,17 +68,27 @@ const COLOR_PRESETS = [
   ['#334155', '#64748B'],
   ['#166534', '#22C55E'],
 ]
+const SESSION_STORAGE_KEY = 'sirtly.session'
+const ROLE_DEFAULT_VIEWS = {
+  admin: 'admin-dashboard',
+  supervisor: 'sup-dashboard',
+  jefe_empresa: 'jefe-dashboard',
+  empleado: 'emp-dashboard',
+  tecnico: 'tec-dashboard',
+}
 
 function App() {
-  const [token, setToken] = useState('')
-  const [user, setUser] = useState(null)
-  const [role, setRole] = useState('admin')
-  const [view, setView] = useState('admin-dashboard')
+  const savedSession = readStoredSession()
+  const [token, setToken] = useState(savedSession.token || '')
+  const [user, setUser] = useState(savedSession.user || null)
+  const [role, setRole] = useState(savedSession.role || 'admin')
+  const [view, setView] = useState(savedSession.view || 'admin-dashboard')
+  const [publicView, setPublicView] = useState('welcome')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [selectedIncidentId, setSelectedIncidentId] = useState(null)
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [selectedUserSource, setSelectedUserSource] = useState(null)
-  const [selectedCompany, setSelectedCompany] = useState(null)
+  const [selectedIncidentId, setSelectedIncidentId] = useState(savedSession.selectedIncidentId || null)
+  const [selectedUser, setSelectedUser] = useState(savedSession.selectedUser || null)
+  const [selectedUserSource, setSelectedUserSource] = useState(savedSession.selectedUserSource || null)
+  const [selectedCompany, setSelectedCompany] = useState(savedSession.selectedCompany || null)
   const [notifications, setNotifications] = useState([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
@@ -99,7 +109,7 @@ function App() {
     statsCompany: null,
     byCompany: [],
     byTechnician: [],
-    settings: null,
+    settings: savedSession.settings || null,
     comments: [],
     attachments: [],
   })
@@ -111,6 +121,7 @@ function App() {
     if (role === 'empleado') return EMPLEADO_MENU
     return TECNICO_MENU
   }, [role])
+  const activeView = token && !isValidViewForRole(view, role) ? defaultViewForRole(role) : view
 
   const currentBranding = token && (role === 'jefe_empresa' || role === 'empleado' || role === 'tecnico') ? data.settings : null
   const brandPrimary = currentBranding?.primary_color || '#2563eb'
@@ -131,6 +142,20 @@ function App() {
     }
     link.setAttribute('href', brandFavicon || sirtlyLogo)
   }, [currentBranding, brandFavicon])
+
+  useEffect(() => {
+    persistSession({
+      token,
+      user,
+      role,
+      view,
+      settings: data.settings,
+      selectedIncidentId,
+      selectedUser,
+      selectedUserSource,
+      selectedCompany,
+    })
+  }, [token, user, role, view, data.settings, selectedIncidentId, selectedUser, selectedUserSource, selectedCompany])
 
   const showToast = (type, message) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -159,8 +184,25 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault()
     const form = new FormData(e.target)
-    const email = form.get('email')
-    const password = form.get('password')
+    const email = String(form.get('email') || '').trim()
+    const password = String(form.get('password') || '')
+
+    if (!email && !password) {
+      notifyError('Introduce tu email y tu contraseña para iniciar sesión')
+      return
+    }
+    if (!email) {
+      notifyError('El email es obligatorio para iniciar sesión')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      notifyError('Introduce un email valido')
+      return
+    }
+    if (!password) {
+      notifyError('La contraseña es obligatoria para iniciar sesión')
+      return
+    }
 
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
@@ -168,15 +210,23 @@ function App() {
       body: JSON.stringify({ email, password }),
     })
 
+    const payload = normalizeApiData(await res.json().catch(() => null))
+
     if (!res.ok) {
-      notifyError('Credenciales inválidas')
+      const firstFieldError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null
+      const apiMessage = payload?.message === 'Invalid credentials.'
+        ? 'Credenciales incorrectas'
+        : payload?.message
+      notifyError(firstFieldError || apiMessage || 'No existe ninguna cuenta con esas credenciales')
       return
     }
 
-    const payload = await res.json()
     setToken(payload.token)
     setUser(payload.user)
-    setRole(payload.user?.role?.name || 'admin')
+    const nextRole = payload.user?.role?.name || 'admin'
+    setRole(nextRole)
+    setView(defaultViewForRole(nextRole))
+    setPublicView('welcome')
     notifySuccess('Sesión iniciada correctamente')
   }
 
@@ -204,7 +254,7 @@ function App() {
       throw new Error(firstFieldError || payload?.message || 'Request failed')
     }
 
-    return payload
+    return normalizeApiData(payload)
   }
 
   const loadAll = async () => {
@@ -240,10 +290,11 @@ function App() {
   useEffect(() => {
     if (token) {
       loadAll()
-      const first = menu[0]
-      setView(first?.key || 'admin-dashboard')
+      if (!isValidViewForRole(view, role)) {
+        setView(defaultViewForRole(role))
+      }
     }
-  }, [token, role])
+  }, [token, role, view])
 
   useEffect(() => {
     setSidebarOpen(false)
@@ -255,7 +306,11 @@ function App() {
     setUser(null)
     setRole('admin')
     setView('admin-dashboard')
-    setData({
+    setSelectedIncidentId(null)
+    setSelectedUser(null)
+    setSelectedUserSource(null)
+    setSelectedCompany(null)
+      setData({
       companies: [],
       users: [],
       incidents: [],
@@ -263,11 +318,12 @@ function App() {
       statsCompany: null,
       byCompany: [],
       byTechnician: [],
-      settings: null,
+    settings: null,
       comments: [],
       attachments: [],
     })
     setToken('')
+    clearStoredSession()
   }
 
   const handleLogout = async () => {
@@ -278,6 +334,7 @@ function App() {
     }
     setProfileMenuOpen(false)
     setPasswordModalOpen(false)
+    setPublicView('login')
     resetSession()
   }
 
@@ -330,17 +387,22 @@ function App() {
 
   if (!token) {
     return (
-      <PublicPortal
-        onLogin={handleLogin}
-        notifyError={notifyError}
-        onContactSubmit={(payload) => {
-          notifySuccess(`Gracias ${payload.name}. Mauro y Pau revisarán tu mensaje para preparar la demo.`)
-        }}
-      />
+      <>
+        <ToastViewport toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />
+        <PublicPortal
+          initialView={publicView}
+          onPublicViewChange={setPublicView}
+          onLogin={handleLogin}
+          notifyError={notifyError}
+          onContactSubmit={(payload) => {
+            notifySuccess(`Gracias ${payload.name}. Mauro y Pau revisarán tu mensaje para preparar la demo.`)
+          }}
+        />
+      </>
     )
   }
 
-  const activeKey = resolveActiveKey(view, selectedUserSource)
+  const activeKey = resolveActiveKey(activeView, selectedUserSource)
   const profileName = `${user?.name || ''} ${user?.last_name || ''}`.trim() || 'Usuario'
   const unreadCount = notifications.filter((n) => !n.read_at).length
 
@@ -416,7 +478,7 @@ function App() {
               <span />
               <span />
             </button>
-            <div className="topbar__title">{resolveTitle(view)}</div>
+            <div className="topbar__title">{resolveTitle(activeView)}</div>
           </div>
           <div className="topbar__actions">
             <div className="notifications">
@@ -505,7 +567,7 @@ function App() {
         <ToastViewport toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />
 
         <main className="main">
-          {renderView(view, role, setView, {
+          {renderView(activeView, role, setView, {
             data,
             setSelectedIncidentId,
             selectedIncidentId,
@@ -701,16 +763,16 @@ function renderView(view, role, onNavigate, ctx) {
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-empleados-edit'); }}
       onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-empleados-create') return <CrearEmpleado notifyError={notifyError} settings={data.settings} onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
-    if (view === 'jefe-empleados-edit') return <EditarUsuario notifyError={notifyError} settings={data.settings} user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); })} />
+    if (view === 'jefe-empleados-create') return <CrearEmpleado notifyError={notifyError} settings={data.settings} onBack={() => onNavigate('jefe-empleados')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }, { successMessage: 'Empleado creado correctamente' })} />
+    if (view === 'jefe-empleados-edit') return <EditarUsuario notifyError={notifyError} settings={data.settings} user={selectedUser} onBack={() => onNavigate('jefe-empleados')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-empleados'); }, { successMessage: 'Empleado actualizado correctamente' })} />
     if (view === 'jefe-tecnicos') return <TecnicosList
       users={data.users}
       onCreate={() => onNavigate('jefe-tecnicos-create')}
       onEdit={(u) => { setSelectedUser(u); onNavigate('jefe-tecnicos-edit'); }}
       onDelete={(u) => runAction(async () => { if (!confirm('¿Eliminar usuario?')) return false; await apiFetch(`/users/${u.id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Usuario eliminado correctamente' })}
     />
-    if (view === 'jefe-tecnicos-create') return <CrearTecnico notifyError={notifyError} settings={data.settings} onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
-    if (view === 'jefe-tecnicos-edit') return <EditarUsuario notifyError={notifyError} settings={data.settings} user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); })} />
+    if (view === 'jefe-tecnicos-create') return <CrearTecnico notifyError={notifyError} settings={data.settings} onBack={() => onNavigate('jefe-tecnicos')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }, { successMessage: 'Técnico creado correctamente' })} />
+    if (view === 'jefe-tecnicos-edit') return <EditarUsuario notifyError={notifyError} settings={data.settings} user={selectedUser} onBack={() => onNavigate('jefe-tecnicos')} onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-tecnicos'); }, { successMessage: 'Técnico actualizado correctamente' })} />
     if (view === 'jefe-incidencias') return <IncidenciasList
       incidents={data.incidents}
       technicians={data.users.filter((u) => u.role?.name === 'tecnico')}
@@ -725,7 +787,7 @@ function renderView(view, role, onNavigate, ctx) {
     />
     if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
-    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'PUT', body: payload }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
+    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'POST', body: payload }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
@@ -768,6 +830,7 @@ function renderView(view, role, onNavigate, ctx) {
       incident={data.incidents.find((i) => i.id === selectedIncidentId)}
       apiFetch={apiFetch}
       onUpdated={loadAll}
+      onBack={() => onNavigate(selectedUserSource || 'tec-asignadas')}
       notifications={notifications}
       currentUserId={currentUser?.id}
       onTakeOwnership={async (id) => {
@@ -1473,7 +1536,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
 
 function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTake, onManage }) {
   const rows = incidents.filter((i) => {
-    if (filterMode === 'available') return !i.assigned_to
+    if (filterMode === 'available') return i.assigned_to == null || !i.assignee
     return i.assigned_to === currentUserId
   })
 
@@ -1508,7 +1571,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
               <td>{formatDate(i.created_at)}</td>
               <td className="actions">
                 {!i.assigned_to && <button type="button" className="btn btn--primary" onClick={() => onTake(i.id)}>Coger</button>}
-                {i.assigned_to === currentUserId && <button type="button" className="icon-btn" aria-label={`Gestionar incidencia ${i.title}`} onClick={() => onManage(i.id)}>✏️</button>}
+                {i.assigned_to === currentUserId && <button type="button" className="btn btn--primary" aria-label={`Entrar a incidencia ${i.title}`} onClick={() => onManage(i.id)}>Entrar a incidencia</button>}
               </td>
             </tr>
           ))}
@@ -1661,7 +1724,7 @@ function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
       name: form.name,
       last_name: form.last_name,
       email: form.email,
-      phone: form.phone,
+      phone: normalizePhoneForSave(form.phone) || null,
       department: form.department,
       specialty: form.specialty,
       active: form.active,
@@ -1715,7 +1778,7 @@ function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
   )
 }
 
-function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onTakeOwnership, notifySuccess, notifyError }) {
+function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onTakeOwnership, notifySuccess, notifyError, onBack }) {
   const formId = useId()
   const [status, setStatus] = useState('open')
   const [comment, setComment] = useState('')
@@ -1780,12 +1843,24 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
     }
   }
 
+  const deleteAttachment = async (attachmentId) => {
+    try {
+      await apiFetch(`/incidents/${incident.id}/attachments?_action=delete&attachment_id=${attachmentId}`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+      const a = await apiFetch(`/incidents/${incident.id}/attachments`)
+      setAttachments(a.attachments || [])
+      notifySuccess?.('Adjunto eliminado correctamente')
+    } catch (error) {
+      notifyError?.(error.message || 'No se pudo eliminar el adjunto')
+    }
+  }
+
   return (
     <div className="grid-2">
       <div className="panel">
-        <div className="panel__header">
-          <h3>Gestionar incidencia</h3>
-        </div>
+        <FormHeader title="Gestionar incidencia" onBack={onBack} />
         <h4>{incident.title}</h4>
         <p className="muted">{incident.description}</p>
         <div className="inline-tags">
@@ -1831,7 +1906,8 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
         <ul className="file-list">
           {attachments.map((a) => (
             <li key={a.id}>
-              <a href={`${API_ROOT}/storage/${a.file_path}`} target="_blank" rel="noreferrer">{a.file_path}</a>
+              <a href={a.url || `${API_ROOT}/storage/${a.file_path}`} target="_blank" rel="noreferrer">{a.file_name || a.file_path}</a>
+              <button type="button" className="icon-btn icon-btn--danger" aria-label={`Eliminar adjunto ${a.file_name || a.file_path}`} onClick={() => deleteAttachment(a.id)}>🗑️</button>
             </li>
           ))}
         </ul>
@@ -1947,6 +2023,7 @@ function ConfiguracionEmpresa({ settings, onSave }) {
 
   const handleSave = () => {
     const payload = new FormData()
+    payload.append('_method', 'PUT')
     payload.append('primary_color', form.primary_color)
     payload.append('secondary_color', form.secondary_color)
     payload.append('system_name', form.system_name)
@@ -2073,24 +2150,102 @@ function SuggestionInput({ id, label, value, onChange, placeholder, suggestions,
 }
 
 function sanitizePhone(value) {
-  return value.replace(/[^0-9+\s()-]/g, '')
+  const cleaned = value.replace(/[^0-9+\s()-]/g, '')
+  return cleaned.startsWith('+34') ? cleaned : cleaned.replace(/^\+/, '')
+}
+
+function readStoredSession() {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function persistSession(session) {
+  if (typeof window === 'undefined') return
+  if (!session.token) {
+    clearStoredSession()
+    return
+  }
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session))
+}
+
+function clearStoredSession() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(SESSION_STORAGE_KEY)
+}
+
+function defaultViewForRole(role) {
+  return ROLE_DEFAULT_VIEWS[role] || 'admin-dashboard'
+}
+
+function isValidViewForRole(view, role) {
+  if (!view) return false
+  return roleMenuFor(role).some((item) => item.key === resolveActiveKey(view))
+    || ['admin-user-edit', 'admin-empresas-create', 'admin-empresas-edit', 'admin-jefes-create', 'admin-admins-create', 'admin-supervisores-create', 'jefe-empleados-create', 'jefe-empleados-edit', 'jefe-tecnicos-create', 'jefe-tecnicos-edit', 'jefe-incidencias-edit', 'emp-edit', 'tec-gestionar'].includes(view)
+}
+
+function roleMenuFor(role) {
+  if (role === 'admin') return ADMIN_MENU
+  if (role === 'supervisor') return SUPERVISOR_MENU
+  if (role === 'jefe_empresa') return JEFE_MENU
+  if (role === 'empleado') return EMPLEADO_MENU
+  return TECNICO_MENU
+}
+
+function normalizePhoneForSave(value) {
+  const cleaned = sanitizePhone(value).trim()
+  if (!cleaned) return ''
+  if (cleaned.startsWith('+34')) return cleaned
+
+  const digits = cleaned.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('34')) return `+${digits}`
+
+  return `+34 ${digits}`
+}
+
+function repairMojibakeText(value) {
+  if (typeof value !== 'string' || !/[ÃÂâ€]/.test(value)) return value
+
+  try {
+    const bytes = Uint8Array.from(Array.from(value).map((char) => char.charCodeAt(0) & 0xff))
+    const repaired = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+    return /�/.test(repaired) ? value : repaired
+  } catch {
+    return value
+  }
+}
+
+function normalizeApiData(value) {
+  if (typeof value === 'string') return repairMojibakeText(value)
+  if (Array.isArray(value)) return value.map(normalizeApiData)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, normalizeApiData(entry)]))
+  }
+  return value
 }
 
 function validateUserForm(form, options = {}) {
+  const normalizedPhone = normalizePhoneForSave(form.phone)
   if (!form.name?.trim()) return 'El nombre es obligatorio'
   if (!form.email?.trim()) return 'El email es obligatorio'
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return 'El email no es valido'
   if (!options.passwordOptional && !form.password?.trim()) return 'La contraseña es obligatoria'
   if (form.password && form.password.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
-  if (form.phone && !new RegExp(PHONE_PATTERN).test(form.phone)) return 'El teléfono no es valido'
+  if (normalizedPhone && !new RegExp(PHONE_PATTERN).test(normalizedPhone)) return 'El teléfono no es valido'
   if (options.requireCompany && !form.company_id) return 'Debes seleccionar una empresa'
   return null
 }
 
 function validateCompanyForm(form) {
+  const normalizedPhone = normalizePhoneForSave(form.phone)
   if (!form.name?.trim()) return 'El nombre de empresa es obligatorio'
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return 'El email no es valido'
-  if (form.phone && !new RegExp(PHONE_PATTERN).test(form.phone)) return 'El teléfono no es valido'
+  if (normalizedPhone && !new RegExp(PHONE_PATTERN).test(normalizedPhone)) return 'El teléfono no es valido'
   if (form.cif && !new RegExp(CIF_PATTERN).test(form.cif)) return 'El CIF no es valido'
   return null
 }
@@ -2120,7 +2275,7 @@ function CrearEmpresa({ onBack, onCreate, notifyError }) {
       notifyError?.(error)
       return
     }
-    onCreate(form)
+    onCreate({ ...form, phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
@@ -2171,7 +2326,7 @@ function EditarEmpresa({ company, onBack, onSave, notifyError }) {
       notifyError?.(error)
       return
     }
-    onSave(form)
+    onSave({ ...form, phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
@@ -2206,7 +2361,7 @@ function CrearJefe({ onBack, onCreate, companies, notifyError }) {
       notifyError?.(error)
       return
     }
-    onCreate({ ...form, role: 'jefe_empresa' })
+    onCreate({ ...form, role: 'jefe_empresa', phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
@@ -2246,7 +2401,7 @@ function CrearAdmin({ onBack, onCreate, notifyError }) {
       notifyError?.(error)
       return
     }
-    onCreate({ ...form, role: 'admin' })
+    onCreate({ ...form, role: 'admin', phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
@@ -2281,7 +2436,7 @@ function CrearSupervisor({ onBack, onCreate, notifyError }) {
       notifyError?.(error)
       return
     }
-    onCreate({ ...form, role: 'supervisor' })
+    onCreate({ ...form, role: 'supervisor', phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
@@ -2317,7 +2472,7 @@ function CrearEmpleado({ onBack, onCreate, settings, notifyError }) {
       notifyError?.(error)
       return
     }
-    onCreate({ ...form, role: 'empleado' })
+    onCreate({ ...form, role: 'empleado', phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
@@ -2362,7 +2517,7 @@ function CrearTecnico({ onBack, onCreate, settings, notifyError }) {
       notifyError?.(error)
       return
     }
-    onCreate({ ...form, role: 'tecnico' })
+    onCreate({ ...form, role: 'tecnico', phone: normalizePhoneForSave(form.phone) || null })
   }
 
   return (
