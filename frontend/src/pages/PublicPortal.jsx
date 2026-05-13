@@ -44,6 +44,7 @@ function PublicBrandLogo({ brandName, brandLogo, product = false }) {
 }
 
 function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMenuOpen }) {
+  const PHONE_REGEX = /^\+?[0-9]{8,10}$/
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -56,16 +57,22 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
     setContactForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const submitContact = (e) => {
+  const submitContact = async (e) => {
     e.preventDefault()
 
     if (!contactForm.name.trim() || !contactForm.email.trim() || !contactForm.company.trim() || !contactForm.phone.trim() || !contactForm.message.trim()) {
       notifyError('Completa nombre, email, empresa, telefono y mensaje para enviarnos tu consulta')
       return
     }
+    if (!PHONE_REGEX.test(contactForm.phone.trim())) {
+      notifyError('Introduce un teléfono válido: solo números y + opcional al inicio, máximo 11 caracteres.')
+      return
+    }
 
-    onContactSubmit(contactForm)
-    setContactForm({ name: '', email: '', company: '', phone: '', message: '' })
+    const sent = await onContactSubmit(contactForm)
+    if (sent) {
+      setContactForm({ name: '', email: '', company: '', phone: '', message: '' })
+    }
   }
 
   const scrollTo = (id) => {
@@ -326,7 +333,23 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
               <input value={contactForm.company} onChange={(e) => updateField('company', e.target.value)} placeholder="Nombre de tu empresa" />
 
               <label>Telefono</label>
-              <input value={contactForm.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="+34 600 111 222" />
+              <input
+                type="tel"
+                inputMode="tel"
+                maxLength={11}
+                pattern="^\+?[0-9]{8,10}$"
+                title="Teléfono válido: solo números y + opcional al inicio (máximo 11 caracteres)"
+                value={contactForm.phone}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const sanitized = raw
+                    .replace(/[^0-9+]/g, '')
+                    .replace(/(?!^)\+/g, '')
+                    .slice(0, 11)
+                  updateField('phone', sanitized)
+                }}
+                placeholder="+3460011122"
+              />
 
               <label>Mensaje</label>
               <textarea

@@ -23,6 +23,8 @@ services:
       dockerfile: backend/Dockerfile
     container_name: sirtly-backend
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     depends_on:
       db:
         condition: service_healthy
