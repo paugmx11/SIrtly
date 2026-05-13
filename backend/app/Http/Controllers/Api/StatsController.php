@@ -40,6 +40,7 @@ class StatsController extends Controller
             'companies_manual_assignment' => $assignmentModes->get('manual', 0),
             'open' => $open ? Incident::where('status_id', $open)->count() : 0,
             'resolved' => $resolved ? Incident::where('status_id', $resolved)->count() : 0,
+            'textocambios' => 'Se han retirado las estadísticas de incidencias para administradores y supervisores, y se han añadido nuevos parámetros de configuración de empresa.',
         ]);
     }
 
