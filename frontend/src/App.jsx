@@ -19,7 +19,6 @@ const PRIORITY_OPTIONS = [
 ]
 
 const ADMIN_MENU = [
-  { key: 'admin-dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'admin-empresas', label: 'Empresas', icon: 'building' },
   { key: 'admin-jefes', label: 'Jefes de empresa', icon: 'briefcase' },
   { key: 'admin-admins', label: 'Administradores', icon: 'shield' },
@@ -28,7 +27,6 @@ const ADMIN_MENU = [
 ]
 
 const SUPERVISOR_MENU = [
-  { key: 'sup-dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'sup-empresas', label: 'Empresas', icon: 'building' },
   { key: 'sup-estadisticas', label: 'Estadísticas', icon: 'chart' },
 ]
@@ -70,8 +68,8 @@ const COLOR_PRESETS = [
 ]
 const SESSION_STORAGE_KEY = 'sirtly.session'
 const ROLE_DEFAULT_VIEWS = {
-  admin: 'admin-dashboard',
-  supervisor: 'sup-dashboard',
+  admin: 'admin-empresas',
+  supervisor: 'sup-empresas',
   jefe_empresa: 'jefe-dashboard',
   empleado: 'emp-dashboard',
   tecnico: 'tec-dashboard',
@@ -394,8 +392,21 @@ function App() {
           onPublicViewChange={setPublicView}
           onLogin={handleLogin}
           notifyError={notifyError}
-          onContactSubmit={(payload) => {
-            notifySuccess(`Gracias ${payload.name}. Mauro y Pau revisarán tu mensaje para preparar la demo.`)
+          onContactSubmit={async (payload) => {
+            const res = await fetch(API_BASE + '/contact', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify(payload),
+            })
+
+            const response = normalizeApiData(await res.json().catch(() => null))
+            if (!res.ok) {
+              const firstFieldError = response?.errors ? Object.values(response.errors)[0]?.[0] : null
+              notifyError(firstFieldError || response?.message || 'No se pudo enviar el formulario')
+              return
+            }
+
+            notifySuccess('Formulario enviado')
           }}
         />
       </>
@@ -1048,6 +1059,8 @@ function TecnicoDashboard({ incidents }) {
 }
 
 function EmpresasList({ data, readonly, onCreate, onEdit }) {
+  const [search, setSearch] = useState('')
+  const rows = data.filter((c) => [c.name, c.cif, c.email, c.phone].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1057,7 +1070,7 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
         {!readonly && <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear empresa</button>}
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1071,7 +1084,7 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((c) => (
+          {rows.map((c) => (
             <tr key={c.id}>
               <td>{c.name}</td>
               <td>{c.cif || '-'}</td>
@@ -1088,13 +1101,14 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
           ))}
         </tbody>
       </table>
-      <div className="panel__footer">{data.length} registros encontrados</div>
+      <div className="panel__footer">{rows.length} registros encontrados</div>
     </div>
   )
 }
 
 function JefesList({ users, onCreate, onEdit, onDelete }) {
-  const rows = users.filter((u) => u.role?.name === 'jefe_empresa')
+  const [search, setSearch] = useState('')
+  const rows = users.filter((u) => u.role?.name === 'jefe_empresa').filter((u) => [u.name, u.last_name, u.email, u.phone, u.company?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1102,7 +1116,7 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear jefe</button>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1140,7 +1154,8 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
 }
 
 function AdminsList({ users, onCreate, onEdit, onDelete }) {
-  const rows = users.filter((u) => u.role?.name === 'admin')
+  const [search, setSearch] = useState('')
+  const rows = users.filter((u) => u.role?.name === 'admin').filter((u) => [u.name, u.last_name, u.email].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1148,7 +1163,7 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear administrador</button>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1181,7 +1196,8 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
 }
 
 function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
-  const rows = users.filter((u) => u.role?.name === 'supervisor')
+  const [search, setSearch] = useState('')
+  const rows = users.filter((u) => u.role?.name === 'supervisor').filter((u) => [u.name, u.last_name, u.email].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1189,7 +1205,7 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear supervisor</button>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1222,7 +1238,8 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
 }
 
 function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
-  const rows = users.filter((u) => u.role?.name === 'empleado')
+  const [search, setSearch] = useState('')
+  const rows = users.filter((u) => u.role?.name === 'empleado').filter((u) => [u.name, u.last_name, u.email, u.department].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1230,7 +1247,7 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear empleado</button>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1265,7 +1282,8 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
 }
 
 function TecnicosList({ users, onCreate, onEdit, onDelete }) {
-  const rows = users.filter((u) => u.role?.name === 'tecnico')
+  const [search, setSearch] = useState('')
+  const rows = users.filter((u) => u.role?.name === 'tecnico').filter((u) => [u.name, u.last_name, u.email, u.specialty].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1273,7 +1291,7 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear técnico</button>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1308,12 +1326,15 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
 }
 
 function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual', onAssign, onEdit, onDelete, notifyError }) {
+  const [search, setSearch] = useState('')
   const [selectedTechnicians, setSelectedTechnicians] = useState({})
   const [pendingAssignments, setPendingAssignments] = useState({})
   const [confirmedAssignments, setConfirmedAssignments] = useState({})
   const [assignmentModalIncidentId, setAssignmentModalIncidentId] = useState(null)
 
-  const assignmentIncident = incidents.find((incident) => incident.id === assignmentModalIncidentId) || null
+  const filteredIncidents = incidents.filter((i) => [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
+
+  const assignmentIncident = filteredIncidents.find((incident) => incident.id === assignmentModalIncidentId) || null
 
   const handleAssign = async (incident) => {
     const technicianId = selectedTechnicians[incident.id] ?? (incident.assigned_to ? String(incident.assigned_to) : '')
@@ -1344,7 +1365,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
         <h3>Incidencias</h3>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1359,7 +1380,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
           </tr>
         </thead>
         <tbody>
-          {incidents.map((i) => {
+          {filteredIncidents.map((i) => {
             const isPending = Boolean(pendingAssignments[i.id])
             const isConfirmed = Boolean(confirmedAssignments[i.id])
             const selectedValue = selectedTechnicians[i.id] ?? (i.assigned_to ? String(i.assigned_to) : '')
@@ -1407,7 +1428,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
           )})}
         </tbody>
       </table>
-      <div className="panel__footer">{incidents.length} registros encontrados</div>
+      <div className="panel__footer">{filteredIncidents.length} registros encontrados</div>
 
       {assignmentIncident && (
         <div className="assignment-modal-overlay" role="presentation" onClick={() => {
@@ -1494,6 +1515,8 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
 }
 
 function MisIncidencias({ incidents, onCreate, onEdit }) {
+  const [search, setSearch] = useState('')
+  const rows = incidents.filter((i) => [i.title, i.description, i.category, i.creator?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1501,7 +1524,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
         <button className="btn btn--primary" onClick={onCreate}><span>+</span> Crear incidencia</button>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>
@@ -1515,7 +1538,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
           </tr>
         </thead>
         <tbody>
-          {incidents.map((i) => (
+          {rows.map((i) => (
             <tr key={i.id}>
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
@@ -1529,16 +1552,17 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
           ))}
         </tbody>
       </table>
-      <div className="panel__footer">{incidents.length} registros encontrados</div>
+      <div className="panel__footer">{rows.length} registros encontrados</div>
     </div>
   )
 }
 
 function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTake, onManage }) {
+  const [search, setSearch] = useState('')
   const rows = incidents.filter((i) => {
     if (filterMode === 'available') return i.assigned_to == null || !i.assignee
     return i.assigned_to === currentUserId
-  })
+  }).filter((i) => [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div className="panel">
@@ -1546,7 +1570,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
         <h3>{title}</h3>
       </div>
       <div className="search">
-        <input type="search" placeholder="Buscar..." aria-label="Buscar" />
+        <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <table className="table">
         <thead>

@@ -19,9 +19,36 @@ class CompanyController extends Controller
             return response()->json(['message' => 'Not authorized.'], 403);
         }
 
-        $companies = Company::orderByDesc('created_at')->get();
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-        return response()->json(['companies' => $companies]);
+        $query = Company::query()->orderByDesc('created_at');
+
+        if (!empty($validated['search'])) {
+            $search = trim((string) $validated['search']);
+            $query->where(function ($inner) use ($search) {
+                $inner->where('name', 'LIKE', '%' . $search . '%')
+                    ->orWhere('cif', 'LIKE', '%' . $search . '%')
+                    ->orWhere('email', 'LIKE', '%' . $search . '%')
+                    ->orWhere('phone', 'LIKE', '%' . $search . '%');
+            });
+        }
+
+        $limit = (int) ($validated['limit'] ?? 10);
+        $companies = $query->paginate($limit)->appends($request->query());
+
+        return response()->json([
+            'companies' => $companies->items(),
+            'pagination' => [
+                'page' => $companies->currentPage(),
+                'limit' => $companies->perPage(),
+                'total' => $companies->total(),
+                'lastPage' => $companies->lastPage(),
+            ],
+        ]);
     }
 
     public function store(Request $request)
