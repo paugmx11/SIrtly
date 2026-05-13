@@ -48,6 +48,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
     name: '',
     email: '',
     company: '',
+    phone: '',
     message: '',
   })
 
@@ -58,13 +59,13 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
   const submitContact = (e) => {
     e.preventDefault()
 
-    if (!contactForm.name.trim() || !contactForm.email.trim() || !contactForm.message.trim()) {
-      notifyError('Completa nombre, email y mensaje para enviarnos tu consulta')
+    if (!contactForm.name.trim() || !contactForm.email.trim() || !contactForm.company.trim() || !contactForm.phone.trim() || !contactForm.message.trim()) {
+      notifyError('Completa nombre, email, empresa, telefono y mensaje para enviarnos tu consulta')
       return
     }
 
     onContactSubmit(contactForm)
-    setContactForm({ name: '', email: '', company: '', message: '' })
+    setContactForm({ name: '', email: '', company: '', phone: '', message: '' })
   }
 
   const scrollTo = (id) => {
@@ -323,6 +324,9 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
 
               <label>Empresa</label>
               <input value={contactForm.company} onChange={(e) => updateField('company', e.target.value)} placeholder="Nombre de tu empresa" />
+
+              <label>Telefono</label>
+              <input value={contactForm.phone} onChange={(e) => updateField('phone', e.target.value)} placeholder="+34 600 111 222" />
 
               <label>Mensaje</label>
               <textarea

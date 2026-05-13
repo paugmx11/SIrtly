@@ -21,7 +21,6 @@ class IncidentController extends Controller
         'closed' => 'cerrada',
     ];
 
-
     private function technicianCandidates(int $companyId)
     {
         return User::query()
@@ -71,23 +70,104 @@ class IncidentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $roleName = $user->role ? $user->role->name : null;
-
-        $query = Incident::with(['creator', 'assignee', 'status'])->orderByDesc('created_at');
+        $roleName = $user->role?->name;
 
         if (in_array($roleName, ['admin', 'supervisor'], true)) {
-            $incidents = $query->get();
-        } elseif ($roleName === 'jefe_empresa') {
-            $incidents = $query->where('company_id', $user->company_id)->get();
-        } elseif ($roleName === 'tecnico') {
-            $incidents = $query->where('company_id', $user->company_id)->get();
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        $validated = $request->validate([
+            'role' => ['nullable', Rule::in(['empleado', 'tecnico', 'jefe_empresa'])],
+            'status' => ['nullable', 'string', 'max:120'],
+            'search' => ['nullable', 'string', 'max:150'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'dateFrom' => ['nullable', 'date'],
+            'dateTo' => ['nullable', 'date'],
+        ]);
+
+        $query = Incident::query()
+            ->with(['creator', 'assignee', 'status'])
+            ->orderByDesc('created_at');
+
+        if ($roleName === 'jefe_empresa' || $roleName === 'tecnico') {
+            $query->where('company_id', $user->company_id);
         } elseif ($roleName === 'empleado') {
-            $incidents = $query->where('created_by', $user->id)->get();
+            $query->where('created_by', $user->id);
         } else {
             return response()->json(['message' => 'Not authorized.'], 403);
         }
 
-        return response()->json(['incidents' => $incidents]);
+        if (!empty($validated['role'])) {
+            if ($validated['role'] === 'empleado') {
+                $query->where('created_by', $user->id);
+            }
+            if ($validated['role'] === 'tecnico') {
+                $query->whereNotNull('assigned_to');
+            }
+        }
+
+        if (!empty($validated['status'])) {
+            $status = mb_strtolower(trim((string) $validated['status']));
+            $statusName = self::STATUS_MAP[$status] ?? $status;
+            $query->whereHas('status', function ($statusQuery) use ($statusName) {
+                $statusQuery->whereRaw('LOWER(name) = ?', [$statusName]);
+            });
+        }
+
+        if (!empty($validated['search'])) {
+            $search = trim((string) $validated['search']);
+            $query->where(function ($inner) use ($search) {
+                $inner
+                    ->where('title', 'LIKE', '%' . $search . '%')
+                    ->orWhere('description', 'LIKE', '%' . $search . '%')
+                    ->orWhere('category', 'LIKE', '%' . $search . '%')
+                    ->orWhereHas('creator', function ($creatorQuery) use ($search) {
+                        $creatorQuery
+                            ->where('name', 'LIKE', '%' . $search . '%')
+                            ->orWhere('last_name', 'LIKE', '%' . $search . '%')
+                            ->orWhere('email', 'LIKE', '%' . $search . '%');
+                    })
+                    ->orWhereHas('assignee', function ($assigneeQuery) use ($search) {
+                        $assigneeQuery
+                            ->where('name', 'LIKE', '%' . $search . '%')
+                            ->orWhere('last_name', 'LIKE', '%' . $search . '%')
+                            ->orWhere('email', 'LIKE', '%' . $search . '%');
+                    });
+            });
+        }
+
+        if (!empty($validated['dateFrom'])) {
+            $query->whereDate('created_at', '>=', $validated['dateFrom']);
+        }
+
+        if (!empty($validated['dateTo'])) {
+            $query->whereDate('created_at', '<=', $validated['dateTo']);
+        }
+
+        $limit = (int) ($validated['limit'] ?? 10);
+        $incidents = $query->paginate($limit)->appends($request->query());
+
+        $statusBreakdown = [];
+        foreach ($incidents->items() as $item) {
+            $key = $item->status?->name ?? 'sin_estado';
+            $statusBreakdown[$key] = ($statusBreakdown[$key] ?? 0) + 1;
+        }
+
+        return response()->json([
+            'incidents' => $incidents->items(),
+            'pagination' => [
+                'page' => $incidents->currentPage(),
+                'limit' => $incidents->perPage(),
+                'total' => $incidents->total(),
+                'lastPage' => $incidents->lastPage(),
+            ],
+            'metrics' => [
+                'open' => $statusBreakdown['abierta'] ?? 0,
+                'closed' => ($statusBreakdown['resuelta'] ?? 0) + ($statusBreakdown['cerrada'] ?? 0),
+                'byStatus' => $statusBreakdown,
+            ],
+        ]);
     }
 
     public function store(Request $request)
@@ -161,11 +241,13 @@ class IncidentController extends Controller
         $user = $request->user();
         $roleName = $user->role ? $user->role->name : null;
 
+        if (in_array($roleName, ['admin', 'supervisor'], true)) {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
         $query = Incident::with(['creator', 'assignee', 'status']);
 
-        if (in_array($roleName, ['admin', 'supervisor'], true)) {
-            $incident = $query->findOrFail($id);
-        } elseif (in_array($roleName, ['jefe_empresa', 'tecnico'], true)) {
+        if (in_array($roleName, ['jefe_empresa', 'tecnico'], true)) {
             $incident = $query->where('company_id', $user->company_id)->findOrFail($id);
         } elseif ($roleName === 'empleado') {
             $incident = $query->where('created_by', $user->id)->findOrFail($id);
@@ -278,7 +360,7 @@ class IncidentController extends Controller
 
         $incident = Incident::findOrFail($id);
         if (in_array($roleName, ['admin', 'supervisor'], true)) {
-            // ok
+            return response()->json(['message' => 'Not authorized.'], 403);
         } elseif ($roleName === 'jefe_empresa') {
             if ($incident->company_id !== $user->company_id) {
                 return response()->json(['message' => 'Not authorized.'], 403);
@@ -311,7 +393,7 @@ class IncidentController extends Controller
 
         $incident = Incident::findOrFail($id);
         if (in_array($roleName, ['admin', 'supervisor'], true)) {
-            // ok
+            return response()->json(['message' => 'Not authorized.'], 403);
         } elseif ($roleName === 'jefe_empresa') {
             if ($incident->company_id !== $user->company_id) {
                 return response()->json(['message' => 'Not authorized.'], 403);

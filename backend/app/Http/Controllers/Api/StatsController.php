@@ -96,4 +96,62 @@ class StatsController extends Controller
 
         return response()->json(['by_technician' => $rows]);
     }
+
+    public function incidents(Request $request)
+    {
+        $user = $request->user();
+        $role = $user->role?->name;
+
+        $query = Incident::query();
+        if ($role === 'jefe_empresa' || $role === 'tecnico') {
+            $query->where('company_id', $user->company_id);
+        } elseif ($role === 'empleado') {
+            $query->where('created_by', $user->id);
+        } elseif (!in_array($role, ['admin', 'supervisor'], true)) {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        $total = (clone $query)->count();
+        $open = (clone $query)->whereHas('status', fn ($s) => $s->where('name', 'abierta'))->count();
+        $closed = (clone $query)->whereHas('status', fn ($s) => $s->whereIn('name', ['resuelta', 'cerrada']))->count();
+
+        $byStatus = (clone $query)
+            ->select('status_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('status_id')
+            ->with('status')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'status' => $row->status?->name ?? 'sin_estado',
+                    'total' => (int) $row->total,
+                ];
+            })
+            ->values();
+
+        $trend = (clone $query)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('day')
+            ->orderBy('day')
+            ->get()
+            ->map(fn ($row) => ['day' => $row->day, 'total' => (int) $row->total])
+            ->values();
+
+        $avgResolutionHours = (clone $query)
+            ->whereHas('status', fn ($s) => $s->whereIn('name', ['resuelta', 'cerrada']))
+            ->whereNotNull('updated_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, created_at, updated_at)) as avg_hours')
+            ->value('avg_hours');
+
+        return response()->json([
+            'metrics' => [
+                'total' => $total,
+                'open' => $open,
+                'closed' => $closed,
+                'avg_resolution_hours' => $avgResolutionHours ? round((float) $avgResolutionHours, 2) : 0,
+            ],
+            'by_status' => $byStatus,
+            'trend' => $trend,
+        ]);
+    }
 }

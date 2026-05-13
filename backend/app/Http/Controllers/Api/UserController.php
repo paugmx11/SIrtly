@@ -49,15 +49,46 @@ class UserController extends Controller
         $user = $request->user();
         $role = $user->role?->name;
 
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:120'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $query = User::with(['role', 'company'])->orderByDesc('created_at');
+
         if ($role === 'admin') {
-            $users = User::with(['role', 'company'])->orderByDesc('created_at')->get();
+            // all users
         } elseif ($role === 'jefe_empresa') {
-            $users = User::with(['role', 'company'])->where('company_id', $user->company_id)->orderByDesc('created_at')->get();
+            $query->where('company_id', $user->company_id);
         } else {
             return response()->json(['message' => 'Not authorized.'], 403);
         }
 
-        return response()->json(['users' => $users]);
+        if (!empty($validated['search'])) {
+            $search = trim((string) $validated['search']);
+            $query->where(function ($inner) use ($search) {
+                $inner->where('name', 'LIKE', '%' . $search . '%')
+                    ->orWhere('last_name', 'LIKE', '%' . $search . '%')
+                    ->orWhere('email', 'LIKE', '%' . $search . '%')
+                    ->orWhere('phone', 'LIKE', '%' . $search . '%')
+                    ->orWhere('department', 'LIKE', '%' . $search . '%')
+                    ->orWhere('specialty', 'LIKE', '%' . $search . '%');
+            });
+        }
+
+        $limit = (int) ($validated['limit'] ?? 10);
+        $users = $query->paginate($limit)->appends($request->query());
+
+        return response()->json([
+            'users' => $users->items(),
+            'pagination' => [
+                'page' => $users->currentPage(),
+                'limit' => $users->perPage(),
+                'total' => $users->total(),
+                'lastPage' => $users->lastPage(),
+            ],
+        ]);
     }
 
     public function store(Request $request)

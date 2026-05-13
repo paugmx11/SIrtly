@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AttachmentController;
 use App\Http\Controllers\Api\CompanySettingsController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ContactController;
 
 Route::prefix('auth')->group(function () {
     Route::post('/registerCompany', [AuthController::class, 'registerCompany'])->middleware('auth:sanctum');
@@ -17,6 +18,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
+
+Route::post('/contact', [ContactController::class, 'store']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/companies', [CompanyController::class, 'index']);
@@ -54,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/stats/company', [StatsController::class, 'company']);
     Route::get('/stats/by-company', [StatsController::class, 'byCompany']);
     Route::get('/stats/by-technician', [StatsController::class, 'byTechnician']);
+    Route::get('/stats/incidents', [StatsController::class, 'incidents']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
