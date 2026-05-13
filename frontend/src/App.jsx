@@ -275,8 +275,10 @@ function App() {
       }
       if (role === 'jefe_empresa' || role === 'empleado' || role === 'tecnico') {
         updates.settings = (await apiFetch('/company-settings')).settings || null
+        updates.incidents = (await apiFetch('/incidents')).incidents || []
+      } else {
+        updates.incidents = []
       }
-      updates.incidents = (await apiFetch('/incidents')).incidents || []
       setNotifications((await apiFetch('/notifications')).notifications || [])
     } catch (e) {
       // ignore
@@ -680,8 +682,8 @@ function resolveTitle(view) {
     'admin-user-edit': 'Editar usuario',
     'admin-estadisticas': 'Estadísticas',
     'sup-dashboard': 'Dashboard',
-    'sup-empresas': 'Empresas',
     'sup-estadisticas': 'Estadísticas',
+    'sup-empresas': 'Empresas',
     'jefe-dashboard': 'Dashboard',
     'jefe-empleados': 'Empleados',
     'jefe-empleados-create': 'Crear empleado',
@@ -728,6 +730,7 @@ function renderView(view, role, onNavigate, ctx) {
   const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, runAction, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications, currentUser, notifyError } = ctx
   if (role === 'admin') {
     if (view === 'admin-dashboard') return <AdminDashboard stats={data.statsSystem} incidents={data.incidents} />
+    if (view === 'admin-estadisticas') return <AdminEstadisticas stats={data.statsSystem} />
     if (view === 'admin-empresas') return <EmpresasList data={data.companies} onCreate={() => onNavigate('admin-empresas-create')} onEdit={(company) => { setSelectedCompany(company); onNavigate('admin-empresas-edit') }} />
     if (view === 'admin-empresas-create') return <CrearEmpresa notifyError={notifyError} onBack={() => onNavigate('admin-empresas')} onCreate={(payload) => runAction(async () => { await apiFetch('/companies', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); }, { successMessage: 'Empresa creada correctamente' })} />
     if (view === 'admin-empresas-edit') return <EditarEmpresa notifyError={notifyError} company={selectedCompany} onBack={() => onNavigate('admin-empresas')} onSave={(payload) => runAction(async () => { await apiFetch(`/companies/${selectedCompany.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-empresas'); }, { successMessage: 'Empresa actualizada correctamente' })} />
@@ -759,12 +762,11 @@ function renderView(view, role, onNavigate, ctx) {
       onSave={(payload) => runAction(async () => { await apiFetch(`/users/${selectedUser.id}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate(selectedUserSource || 'admin-jefes'); }, { successMessage: 'Usuario actualizado correctamente' })}
     />
     if (view === 'admin-supervisores-create') return <CrearSupervisor notifyError={notifyError} onBack={() => onNavigate('admin-supervisores')} onCreate={(payload) => runAction(async () => { await apiFetch('/users', { method: 'POST', body: JSON.stringify(payload) }); await loadAll(); onNavigate('admin-supervisores'); }, { successMessage: 'Supervisor creado correctamente' })} />
-    if (view === 'admin-estadisticas') return <EstadisticasSistema byCompany={data.byCompany} />
   }
   if (role === 'supervisor') {
     if (view === 'sup-dashboard') return <SupervisorDashboard stats={data.statsSystem} incidents={data.incidents} />
+    if (view === 'sup-estadisticas') return <SupervisorEstadisticas stats={data.statsSystem} />
     if (view === 'sup-empresas') return <EmpresasList data={data.companies} readonly />
-    if (view === 'sup-estadisticas') return <EstadisticasSistema byCompany={data.byCompany} />
   }
   if (role === 'jefe_empresa') {
     if (view === 'jefe-dashboard') return <JefeDashboard stats={data.statsCompany} incidents={data.incidents} />
@@ -797,7 +799,7 @@ function renderView(view, role, onNavigate, ctx) {
       onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return false; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Incidencia eliminada correctamente' })}
     />
     if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
-    if (view === 'jefe-estadisticas') return <EstadisticasEmpresa byTechnician={data.byTechnician} />
+    if (view === 'jefe-estadisticas') return <EstadisticasEmpresa statsCompany={data.statsCompany} byTechnician={data.byTechnician} />
     if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'POST', body: payload }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
   }
   if (role === 'empleado') {
@@ -935,26 +937,14 @@ function AdminDashboard({ stats, incidents }) {
   const cards = [
     { label: 'Empresas', value: stats?.companies || 0, icon: '🏢', color: 'blue' },
     { label: 'Usuarios totales', value: stats?.users || 0, icon: '👥', color: 'purple' },
-    { label: 'Incidencias', value: stats?.incidents || 0, icon: '📄', color: 'indigo' },
-    { label: 'Abiertas', value: stats?.open || 0, icon: '•', color: 'gray' },
-    { label: 'Resueltas', value: stats?.resolved || 0, icon: '✔', color: 'green' },
+    { label: 'Empresas con marca', value: stats?.companies_with_branding || 0, icon: '🎨', color: 'indigo' },
+    { label: 'Asignación automática + especialidad', value: (stats?.companies_auto_assignment || 0) + (stats?.companies_specialty_assignment || 0), icon: '⚙️', color: 'green' },
   ]
-
-  const rows = incidents.slice(0, 4).map((i) => ({
-    title: i.title,
-    person: i.assignee?.name || '-',
-    priority: labelPriority(i.priority),
-    priorityClass: priorityClass(i.priority),
-    status: labelStatus(i.status?.name),
-    statusClass: statusClass(labelStatus(i.status?.name)),
-    date: formatDate(i.created_at),
-  }))
 
   return (
     <div>
       <h2 className="section-title">Dashboard — <span>Administrador</span></h2>
       <StatCards cards={cards} />
-      <RecentTable rows={rows} />
     </div>
   )
 }
@@ -962,24 +952,92 @@ function AdminDashboard({ stats, incidents }) {
 function SupervisorDashboard({ stats, incidents }) {
   const cards = [
     { label: 'Empresas', value: stats?.companies || 0, icon: '🏢', color: 'blue' },
-    { label: 'Total incidencias', value: stats?.incidents || 0, icon: '📄', color: 'purple' },
-    { label: 'Abiertas', value: stats?.open || 0, icon: '•', color: 'gray' },
-    { label: 'Resueltas', value: stats?.resolved || 0, icon: '✔', color: 'green' },
+    { label: 'Empresas con identidad visual configurada', value: stats?.companies_with_branding || 0, icon: '🎨', color: 'indigo' },
+    { label: 'Empresas con asignación automática', value: stats?.companies_auto_assignment || 0, icon: '⚙️', color: 'green' },
+    { label: 'Empresas con asignación por especialidad', value: stats?.companies_specialty_assignment || 0, icon: '🧩', color: 'purple' },
   ]
-  const rows = incidents.slice(0, 4).map((i) => ({
-    title: i.title,
-    person: i.assignee?.name || '-',
-    priority: labelPriority(i.priority),
-    priorityClass: priorityClass(i.priority),
-    status: labelStatus(i.status?.name),
-    statusClass: statusClass(labelStatus(i.status?.name)),
-    date: formatDate(i.created_at),
-  }))
   return (
     <div>
       <h2 className="section-title">Dashboard — <span>Supervisor</span></h2>
       <StatCards cards={cards} />
-      <RecentTable rows={rows} />
+    </div>
+  )
+}
+
+function AdminEstadisticas({ stats }) {
+  const totalCompanies = stats?.companies || 0
+  const assignmentRows = [
+    { label: 'Asignación automática activa', value: stats?.companies_auto_assignment || 0 },
+    { label: 'Asignación por especialidad activa', value: stats?.companies_specialty_assignment || 0 },
+    { label: 'Asignación manual activa', value: stats?.companies_manual_assignment || 0 },
+  ]
+  const cards = [
+    { label: 'Total de empresas', value: totalCompanies, icon: '🏢', color: 'blue' },
+    { label: 'Total de usuarios', value: stats?.users || 0, icon: '👥', color: 'purple' },
+    { label: 'Empresas con identidad visual configurada', value: stats?.companies_with_branding || 0, icon: '🎨', color: 'indigo' },
+    { label: 'Empresas con asignación automática/especialidad', value: (stats?.companies_auto_assignment || 0) + (stats?.companies_specialty_assignment || 0), icon: '⚙️', color: 'green' },
+  ]
+
+  return (
+    <div>
+      <h2 className="section-title">Estadísticas — <span>Empresas</span></h2>
+      <StatCards cards={cards} />
+      <div className="panel">
+        <div className="panel__title">Resumen de configuración por empresa</div>
+        <div className="bar-list">
+          <div className="bar-row">
+            <span>Empresas con identidad visual configurada</span>
+            <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round(((stats?.companies_with_branding || 0) / Math.max(totalCompanies, 1)) * 100)}%` }} /></div>
+            <span className="muted">{stats?.companies_with_branding || 0}</span>
+          </div>
+          {assignmentRows.map((row) => (
+            <div key={row.label} className="bar-row">
+              <span>{row.label}</span>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round((row.value / Math.max(totalCompanies, 1)) * 100)}%` }} /></div>
+              <span className="muted">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SupervisorEstadisticas({ stats }) {
+  const totalCompanies = stats?.companies || 0
+  const assignmentRows = [
+    { label: 'Asignación automática activa', value: stats?.companies_auto_assignment || 0 },
+    { label: 'Asignación por especialidad activa', value: stats?.companies_specialty_assignment || 0 },
+    { label: 'Asignación manual activa', value: stats?.companies_manual_assignment || 0 },
+  ]
+  const cards = [
+    { label: 'Total de empresas', value: totalCompanies, icon: '🏢', color: 'blue' },
+    { label: 'Empresas con identidad visual configurada', value: stats?.companies_with_branding || 0, icon: '🎨', color: 'indigo' },
+    { label: 'Empresas con asignación automática', value: stats?.companies_auto_assignment || 0, icon: '⚙️', color: 'green' },
+    { label: 'Empresas con asignación por especialidad', value: stats?.companies_specialty_assignment || 0, icon: '🧩', color: 'purple' },
+  ]
+
+  return (
+    <div>
+      <h2 className="section-title">Estadísticas — <span>Empresas</span></h2>
+      <StatCards cards={cards} />
+      <div className="panel">
+        <div className="panel__title">Resumen de configuración por empresa</div>
+        <div className="bar-list">
+          <div className="bar-row">
+            <span>Empresas con identidad visual configurada</span>
+            <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round(((stats?.companies_with_branding || 0) / Math.max(totalCompanies, 1)) * 100)}%` }} /></div>
+            <span className="muted">{stats?.companies_with_branding || 0}</span>
+          </div>
+          {assignmentRows.map((row) => (
+            <div key={row.label} className="bar-row">
+              <span>{row.label}</span>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round((row.value / Math.max(totalCompanies, 1)) * 100)}%` }} /></div>
+              <span className="muted">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1559,10 +1617,32 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
 
 function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTake, onManage }) {
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [priorityFilter, setPriorityFilter] = useState('all')
+
+  const statusOptions = useMemo(() => {
+    const labels = new Set(
+      incidents
+        .map((incident) => labelStatus(incident.status?.name))
+        .filter(Boolean),
+    )
+    return Array.from(labels).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [incidents])
+
   const rows = incidents.filter((i) => {
     if (filterMode === 'available') return i.assigned_to == null || !i.assignee
     return i.assigned_to === currentUserId
-  }).filter((i) => [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
+  }).filter((i) => {
+    const matchesSearch = [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name]
+      .join(' ')
+      .toLowerCase()
+      .includes(search.toLowerCase())
+    const normalizedStatus = labelStatus(i.status?.name)
+    const matchesStatus = statusFilter === 'all' || normalizedStatus === statusFilter
+    const matchesPriority = priorityFilter === 'all' || i.priority === priorityFilter
+
+    return matchesSearch && matchesStatus && matchesPriority
+  })
 
   return (
     <div className="panel">
@@ -1571,6 +1651,18 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
       </div>
       <div className="search">
         <input type="search" placeholder="Buscar..." aria-label="Buscar" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select aria-label="Filtrar por estado" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="all">Todos los estados</option>
+          {statusOptions.map((status) => (
+            <option key={status} value={status}>{status}</option>
+          ))}
+        </select>
+        <select aria-label="Filtrar por prioridad" value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+          <option value="all">Todas las prioridades</option>
+          {PRIORITY_OPTIONS.map((priority) => (
+            <option key={priority.value} value={priority.value}>{priority.label}</option>
+          ))}
+        </select>
       </div>
       <table className="table">
         <thead>
@@ -1968,16 +2060,34 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
 }
 
 function EstadisticasSistema({ byCompany }) {
+  const totalIncidents = byCompany.reduce((sum, row) => sum + row.total, 0)
+  const companyMax = Math.max(...byCompany.map((row) => row.total), 1)
+
   return (
     <div>
       <h2 className="section-title">Estadísticas <span>del sistema</span></h2>
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div>
+            <div className="stat-card__label">Empresas con incidencias</div>
+            <div className="stat-card__value">{byCompany.length}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div>
+            <div className="stat-card__label">Incidencias registradas</div>
+            <div className="stat-card__value">{totalIncidents}</div>
+          </div>
+        </div>
+      </div>
+
       <div className="panel">
         <div className="panel__title">Incidencias por empresa</div>
         <div className="bar-list">
           {byCompany.map((row) => (
             <div key={row.company_id} className="bar-row">
               <span>{row.company}</span>
-              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.min(row.total * 5, 100)}%` }} /></div>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round((row.total / companyMax) * 100)}%` }} /></div>
               <span className="muted">{row.total}</span>
             </div>
           ))}
@@ -1987,18 +2097,73 @@ function EstadisticasSistema({ byCompany }) {
   )
 }
 
-function EstadisticasEmpresa({ byTechnician }) {
+function EstadisticasEmpresa({ statsCompany, byTechnician }) {
+  const totalIncidents = statsCompany?.incidents || 0
+  const technicianMax = Math.max(...byTechnician.map((row) => row.total), 1)
+  const statusRows = [
+    { label: 'Abiertas', value: statsCompany?.open || 0 },
+    { label: 'En proceso', value: statsCompany?.in_progress || 0 },
+    { label: 'Resueltas', value: statsCompany?.resolved || 0 },
+  ]
+
   return (
     <div>
       <h2 className="section-title">Estadísticas <span>de empresa</span></h2>
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div>
+            <div className="stat-card__label">Empleados</div>
+            <div className="stat-card__value">{statsCompany?.employees ?? 0}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div>
+            <div className="stat-card__label">Incidencias totales</div>
+            <div className="stat-card__value">{totalIncidents}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div>
+            <div className="stat-card__label">Promedio por empleado</div>
+            <div className="stat-card__value">{statsCompany?.employees ? (totalIncidents / statsCompany.employees).toFixed(1) : '0.0'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel__title">Estado de incidencias</div>
+        <div className="bar-list">
+          {statusRows.map((row) => (
+            <div key={row.label} className="bar-row">
+              <span>{row.label}</span>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round((row.value / Math.max(totalIncidents, 1)) * 100)}%` }} /></div>
+              <span className="muted">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="panel">
         <div className="panel__title">Incidencias por técnico</div>
         <div className="bar-list">
           {byTechnician.map((row) => (
             <div key={row.technician_id} className="bar-row">
               <span>{row.technician}</span>
-              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.min(row.total * 8, 100)}%` }} /></div>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round((row.total / technicianMax) * 100)}%` }} /></div>
               <span className="muted">{row.total}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel__title">Carga relativa del equipo</div>
+        <div className="bar-list">
+          {byTechnician.map((row) => (
+            <div key={`share-${row.technician_id}`} className="bar-row">
+              <span>{row.technician}</span>
+              <div className="bar-track"><div className="bar-fill" style={{ width: `${Math.round((row.total / Math.max(totalIncidents, 1)) * 100)}%` }} /></div>
+              <span className="muted">{totalIncidents ? `${Math.round((row.total / totalIncidents) * 100)}%` : '0%'}</span>
             </div>
           ))}
         </div>

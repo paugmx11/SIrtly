@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\CompanySetting;
 use App\Models\Incident;
 use App\Models\IncidentStatus;
 use App\Models\User;
@@ -22,10 +23,21 @@ class StatsController extends Controller
         $open = IncidentStatus::where('name', 'abierta')->value('id');
         $resolved = IncidentStatus::where('name', 'resuelta')->value('id');
 
+        $assignmentModes = CompanySetting::select('assignment_mode', DB::raw('COUNT(*) as total'))
+            ->groupBy('assignment_mode')
+            ->pluck('total', 'assignment_mode');
+
         return response()->json([
             'companies' => Company::count(),
             'users' => User::count(),
-            'incidents' => Incident::count(),
+            'companies_with_branding' => CompanySetting::where(function ($query) {
+                $query->whereNotNull('logo')
+                    ->orWhereNotNull('system_name')
+                    ->orWhereNotNull('favicon');
+            })->count(),
+            'companies_auto_assignment' => $assignmentModes->get('auto', 0),
+            'companies_specialty_assignment' => $assignmentModes->get('specialty', 0),
+            'companies_manual_assignment' => $assignmentModes->get('manual', 0),
             'open' => $open ? Incident::where('status_id', $open)->count() : 0,
             'resolved' => $resolved ? Incident::where('status_id', $resolved)->count() : 0,
         ]);

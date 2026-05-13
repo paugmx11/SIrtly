@@ -778,6 +778,19 @@
   align-items: center;
 }
 
+.stat-card__label {
+  font-size: 13px;
+  color: #64748b;
+  letter-spacing: 0.01em;
+  margin-bottom: 4px;
+}
+
+.stat-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
 .stat-icon {
   width: 44px;
   height: 44px;
@@ -1024,12 +1037,21 @@
   background: #fef2f2;
 }
 
-.search input {
+.search {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search input,
+.search select {
   width: 320px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--line);
   outline: none;
+  background: #fff;
 }
 
 .btn {
@@ -1388,7 +1410,8 @@
     gap: 10px;
   }
 
-  .search input {
+  .search input,
+  .search select {
     width: 100%;
   }
 
