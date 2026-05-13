@@ -405,10 +405,11 @@ function App() {
             if (!res.ok) {
               const firstFieldError = response?.errors ? Object.values(response.errors)[0]?.[0] : null
               notifyError(firstFieldError || response?.message || 'No se pudo enviar el formulario')
-              return
+              return false
             }
 
             notifySuccess('Formulario enviado')
+            return true
           }}
         />
       </>
