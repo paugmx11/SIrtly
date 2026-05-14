@@ -1221,6 +1221,35 @@
   overflow: hidden;
 }
 
+.branding-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.branding-upload-row input[type="file"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.branding-upload-preview {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 1px solid #dbe3ee;
+  background: #fff;
+  padding: 6px;
+  flex-shrink: 0;
+}
+
+.branding-upload-preview--small {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
 .theme-preview {
   --brand-primary: #2563eb;
   --brand-secondary: #7c3aed;

@@ -6,16 +6,31 @@ const LICENSE_SOURCE_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE
 const LICENSE_ASSETS_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE-ASSETS.md'
 
 export default function PublicPortal({ onLogin, onContactSubmit, notifyError, initialView = 'welcome', onPublicViewChange }) {
-  const [publicView, setPublicView] = useState(initialView)
+  const [publicView, setPublicView] = useState(readPublicViewFromHash(initialView))
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
-    setPublicView(initialView)
+    setPublicView(readPublicViewFromHash(initialView))
   }, [initialView])
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const nextHash = publicView === 'login' ? '#login' : ''
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`)
+      }
+    }
     onPublicViewChange?.(publicView)
   }, [onPublicViewChange, publicView])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const handleHashChange = () => {
+      setPublicView(readPublicViewFromHash(initialView))
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [initialView])
 
   return publicView === 'login'
     ? <LoginScreen onBack={() => setPublicView('welcome')} onSubmit={onLogin} />
@@ -122,12 +137,9 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
       <main className="landing__main">
         <section className="landing__hero">
           <div className="landing__hero-copy">
-            <div className="landing__eyebrow">Soporte técnico con identidad propia</div>
-            <h1>Gestiona incidencias, equipos y empresas desde un portal claro, profesional y preparado para crecer.</h1>
-            <p>
-              Sirtly está pensado para empresas que necesitan orden, seguimiento y una imagen cuidada.
-              Centraliza incidencias, técnicos, empleados, comentarios, adjuntos y estadísticas en un solo lugar.
-            </p>
+            <div className="landing__eyebrow">Portal multiempresa para soporte técnico</div>
+            <h1>Sirtly ordena tu soporte.</h1>
+            <p>Incidencias, equipos y branding de empresa en un solo portal.</p>
 
             <div className="landing__hero-actions">
               <button className="btn btn--primary landing__hero-primary" onClick={onGoLogin}>Acceder al portal</button>
@@ -150,83 +162,70 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
             </div>
           </div>
 
-          <div className="landing__hero-stack">
-            <div className="landing__hero-visual">
-              <div className="landing__mockup">
-                <div className="landing__mockup-header">
-                  <span className="landing__dot" />
-                  <span className="landing__dot" />
-                  <span className="landing__dot" />
-                </div>
+          <div className="landing__hero-visual">
+            <div className="landing__mockup">
+              <div className="landing__mockup-header">
+                <span className="landing__dot" />
+                <span className="landing__dot" />
+                <span className="landing__dot" />
+              </div>
 
-                <div className="landing__mockup-body">
-                  <aside className="landing__mockup-sidebar">
-                    <div className="landing__mini-brand">
-                      <PublicBrandLogo brandName="Sirtly" product />
-                      <div>
-                        <strong>Sirtly</strong>
-                        <span>Jefe de empresa</span>
-                      </div>
+              <div className="landing__mockup-body">
+                <aside className="landing__mockup-sidebar">
+                  <div className="landing__mini-brand">
+                    <PublicBrandLogo brandName="Sirtly" product />
+                    <div>
+                      <strong>Sirtly</strong>
+                      <span>Jefe de empresa</span>
                     </div>
+                  </div>
 
-                    <div className="landing__mini-menu">
-                      <span>Dashboard</span>
-                      <span>Empleados</span>
-                      <span>Técnicos</span>
-                      <span className="active">Incidencias</span>
-                      <span>Estadísticas</span>
-                      <span>Configuración</span>
+                  <div className="landing__mini-menu">
+                    <span>Dashboard</span>
+                    <span>Empleados</span>
+                    <span>Técnicos</span>
+                    <span className="active">Incidencias</span>
+                    <span>Estadísticas</span>
+                    <span>Configuración</span>
+                  </div>
+                </aside>
+
+                <div className="landing__mockup-content">
+                  <div className="landing__mockup-cards">
+                    <article>
+                      <span>Abiertas</span>
+                      <strong>18</strong>
+                    </article>
+                    <article>
+                      <span>En progreso</span>
+                      <strong>7</strong>
+                    </article>
+                    <article>
+                      <span>Resueltas</span>
+                      <strong>42</strong>
+                    </article>
+                  </div>
+
+                  <div className="landing__mockup-ticket">
+                    <div>
+                      <strong>Monitor parpadea intermitente</strong>
+                      <p>Seguimiento con comentarios, adjuntos y técnico asignado.</p>
                     </div>
-                  </aside>
+                    <span className="landing__status">En progreso</span>
+                  </div>
 
-                  <div className="landing__mockup-content">
-                    <div className="landing__mockup-cards">
-                      <article>
-                        <span>Abiertas</span>
-                        <strong>18</strong>
-                      </article>
-                      <article>
-                        <span>En progreso</span>
-                        <strong>7</strong>
-                      </article>
-                      <article>
-                        <span>Resueltas</span>
-                        <strong>42</strong>
-                      </article>
-                    </div>
-
-                    <div className="landing__mockup-ticket">
-                      <div>
-                        <strong>Monitor parpadea intermitente</strong>
-                        <p>Seguimiento con comentarios, adjuntos y técnico asignado.</p>
-                      </div>
-                      <span className="landing__status">En progreso</span>
-                    </div>
-
-                    <div className="landing__mockup-theme">
-                      <div className="landing__theme-label">Vista personalizable para cada empresa</div>
-                      <div className="landing__theme-swatches">
-                        <span style={{ background: '#2D61E5' }} />
-                        <span style={{ background: '#1D4ED8' }} />
-                        <span style={{ background: '#3B82F6' }} />
-                        <span style={{ background: '#22C55E' }} />
-                      </div>
+                  <div className="landing__mockup-theme">
+                    <div className="landing__theme-label">Vista personalizable para cada empresa</div>
+                    <div className="landing__theme-swatches">
+                      <span style={{ background: '#2D61E5' }} />
+                      <span style={{ background: '#1D4ED8' }} />
+                      <span style={{ background: '#3B82F6' }} />
+                      <span style={{ background: '#22C55E' }} />
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-
-            <article className="landing__hero-note">
-              <div className="landing__hero-note-title">Propuesta de valor</div>
-              <p>
-                Diseñado para empresas que quieren un portal de incidencias moderno, visualmente adaptable
-                y fácil de usar tanto para equipos internos como para responsables de gestión.
-              </p>
-              <p>
-                La idea es simple: que la gestión diaria se sienta ordenada, rápida y coherente con la imagen de cada empresa.
-              </p>
-            </article>
           </div>
         </section>
 
@@ -302,6 +301,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
                 <p>Queríamos que Sirtly se viera como un producto serio, útil y adaptable a cada empresa, no como un gestor genérico más.</p>
               </div>
               <div className="landing__team">
+                <div className="landing__contact-intro-tag">Proyecto de 2º DAW</div><br></br>
                 <div className="landing__team-badge">Mauro y Pau</div>
                 <h3>Estudiantes de DAW impulsando una solución real</h3>
                 <p>Hemos planteado Sirtly como un producto diferencial: sólido en backend, claro en frontend y preparado para escalar con empresas y roles distintos.</p>
@@ -313,11 +313,9 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
         <section className="landing__section landing__contact" id="contacto">
           <div className="landing__section-head">
             <div className="landing__eyebrow landing__eyebrow--dark">Contacto</div>
-            <h2>Si quieres hablar con nosotros sobre Sirtly, déjanos tus datos y tu mensaje.</h2>
+            <h2>Contacta con nosotros y envíanos tu mensaje</h2>
             <div className="landing__contact-intro">
-              <div className="landing__contact-intro-tag">Proyecto de 2º DAW</div>
-              <p>Una propuesta desarrollada en 2º DAW con foco en experiencia de usuario, arquitectura clara y un producto que destaque visual y funcionalmente.</p>
-              <p>Podéis escribirnos para conocer mejor el producto, resolver dudas sobre el flujo de roles y la personalización, proponer mejoras o abrir una conversación directa con nosotros.</p>
+              
             </div>
           </div>
 
@@ -362,27 +360,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
               <button className="btn btn--primary landing__contact-submit" type="submit">Enviar mensaje</button>
             </form>
 
-            <aside className="landing__contact-side">
-              <article className="landing__contact-panel landing__contact-panel--accent">
-                <h3>Hablemos con contexto</h3>
-                <p>Cuéntanos brevemente qué te interesa de Sirtly y podremos responderte con una conversación mucho más útil.</p>
-              </article>
 
-              <article className="landing__contact-panel">
-                <h4>Qué puedes comentarnos</h4>
-                <ul>
-                  <li>Cómo encajaría Sirtly en una empresa real</li>
-                  <li>Dudas sobre roles, asignaciones y personalización</li>
-                  <li>Mejoras, feedback o ideas de evolución del producto</li>
-                </ul>
-              </article>
-
-              <article className="landing__contact-panel landing__contact-panel--compact">
-                <span className="landing__contact-kicker">Equipo</span>
-                <strong>Estudiantes de 2º DAW</strong>
-                <p>Proyecto orientado a producto real, diseño cuidado y arquitectura clara.</p>
-              </article>
-            </aside>
           </div>
         </section>
       </main>
@@ -427,6 +405,11 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
       </footer>
     </div>
   )
+}
+
+function readPublicViewFromHash(fallback = 'welcome') {
+  if (typeof window === 'undefined') return fallback
+  return window.location.hash === '#login' ? 'login' : fallback
 }
 
 function LoginScreen({ onSubmit, onBack }) {

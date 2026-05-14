@@ -2273,17 +2273,23 @@ function ConfiguracionEmpresa({ settings, onSave }) {
           <label htmlFor={`${formId}-system-name`}>Nombre visible</label>
           <input id={`${formId}-system-name`} value={form.system_name} onChange={(e) => setForm({ ...form, system_name: e.target.value })} placeholder="TechSolutions S.L." />
           <label htmlFor={`${formId}-logo`}>Logo de la empresa</label>
-          <input id={`${formId}-logo`} type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={(e) => {
-            const file = e.target.files?.[0] || null
-            setLogoFile(file)
-            if (file) setLogoPreview(URL.createObjectURL(file))
-          }} />
+          <div className="branding-upload-row">
+            <input id={`${formId}-logo`} type="file" accept=".png,.jpg,.jpeg,.svg,.webp" onChange={(e) => {
+              const file = e.target.files?.[0] || null
+              setLogoFile(file)
+              if (file) setLogoPreview(URL.createObjectURL(file))
+            }} />
+            {logoPreview && <img className="branding-upload-preview" src={logoPreview} alt="Vista previa del logo" />}
+          </div>
           <label htmlFor={`${formId}-favicon`}>Favicon</label>
-          <input id={`${formId}-favicon`} type="file" accept=".png,.ico,.svg,.webp" onChange={(e) => {
-            const file = e.target.files?.[0] || null
-            setFaviconFile(file)
-            if (file) setFaviconPreview(URL.createObjectURL(file))
-          }} />
+          <div className="branding-upload-row">
+            <input id={`${formId}-favicon`} type="file" accept=".png,.ico,.svg,.webp" onChange={(e) => {
+              const file = e.target.files?.[0] || null
+              setFaviconFile(file)
+              if (file) setFaviconPreview(URL.createObjectURL(file))
+            }} />
+            {faviconPreview && <img className="branding-upload-preview branding-upload-preview--small" src={faviconPreview} alt="Vista previa del favicon" />}
+          </div>
           {faviconPreview && <img className="favicon-preview" src={faviconPreview} alt="Favicon" />}
           <div className="config-note">
             El logo y la identidad visual se aplican en los paneles de jefe de empresa, técnico y empleado.
