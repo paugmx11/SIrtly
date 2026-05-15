@@ -131,6 +131,12 @@ class IncidentController extends Controller
             }
         }
 
+        // Normalización: algunos sistemas pueden no devolver siempre `status.name` consistente.
+        // Para evitar que el frontend no muestre incidencias por filtros basados en estado,
+        // forzamos que el query incluya la relación `status` (ya se carga con ->with)
+        // y añadimos un filtro adicional cuando el frontend pide `status`.
+
+
         if (!empty($validated['status'])) {
             $status = mb_strtolower(trim((string) $validated['status']));
             $statusName = self::STATUS_MAP[$status] ?? $status;
