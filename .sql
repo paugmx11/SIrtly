@@ -204,33 +204,33 @@ ON DUPLICATE KEY UPDATE email=VALUES(email);
 -- Incidents
 INSERT INTO incidents (id, company_id, created_by, assigned_to, status_id, title, description, category, priority, created_at, updated_at)
 VALUES
-(100, 1, 30, 20, 1, 'Error en servidor de correo', 'El servidor de correo no responde desde las 8:00.', 'Redes', 'high', '2024-12-15', '2024-12-15'),
-(101, 1, 31, 22, 2, 'Impresora planta 2 no funciona', 'La impresora no imprime desde ayer.', 'Hardware', 'medium', '2024-12-14', '2024-12-14'),
-(102, 1, 32, 21, 2, 'Actualización CRM fallida', 'Fallo durante el despliegue del CRM.', 'Software', 'urgent', '2024-12-13', '2024-12-13'),
-(103, 1, 33, 20, 3, 'VPN sin acceso remoto', 'No hay acceso externo por VPN.', 'Redes', 'high', '2024-12-12', '2024-12-12'),
-(104, 1, 30, 21, 4, 'Licencia Office expirada', 'Licencias caducadas en equipos.', 'Software', 'low', '2024-12-10', '2024-12-10'),
-(105, 1, 31, 22, 1, 'Monitor parpadea intermitente', 'El monitor presenta parpadeos.', 'Hardware', 'low', '2024-12-16', '2024-12-16')
+(100, 1, 30, 20, 1, 'Error en servidor de correo', 'El servidor de correo no responde desde las 8:00.', 'Redes', 'high', '2026-05-10', '2026-05-10'),
+(101, 1, 31, NULL, 1, 'Impresora planta 2 no funciona', 'La impresora no imprime desde ayer.', 'Hardware', 'medium', '2026-05-11', '2026-05-11'),
+(102, 1, 32, 21, 2, 'Actualización CRM fallida', 'Fallo durante el despliegue del CRM.', 'Software', 'urgent', '2026-05-12', '2026-05-12'),
+(103, 1, 33, 20, 3, 'VPN sin acceso remoto', 'No hay acceso externo por VPN.', 'Redes', 'high', '2026-05-13', '2026-05-13'),
+(104, 1, 30, 21, 4, 'Licencia Office expirada', 'Licencias caducadas en equipos.', 'Software', 'low', '2026-05-09', '2026-05-09'),
+(105, 1, 31, NULL, 1, 'Monitor parpadea intermitente', 'El monitor presenta parpadeos.', 'Hardware', 'low', '2026-05-14', '2026-05-14')
 ON DUPLICATE KEY UPDATE title=VALUES(title);
 
 -- Incident status history
 INSERT INTO incident_status_history (incident_id, status_id, changed_by, changed_at)
 VALUES
-(100, 1, 20, '2024-12-15 09:00:00'),
-(101, 2, 22, '2024-12-14 10:00:00'),
-(102, 2, 21, '2024-12-13 11:00:00'),
-(103, 3, 20, '2024-12-12 12:00:00');
+(100, 1, 20, '2026-05-10 09:00:00'),
+(101, 1, 22, '2026-05-11 10:00:00'),
+(102, 2, 21, '2026-05-12 11:00:00'),
+(103, 3, 20, '2026-05-13 12:00:00');
 
 -- Comments
 INSERT INTO incident_comments (incident_id, user_id, comment, created_at)
 VALUES
-(100, 30, 'El servidor de correo no responde desde las 8:00 de la mañana.', '2024-12-15 09:30:00'),
-(100, 20, 'He revisado el servidor. El servicio SMTP está caído. Reiniciando el servicio y verificando los logs.', '2024-12-15 10:15:00'),
-(100, 20, 'El servicio se reinició correctamente pero hay un problema con el certificado SSL. Estoy renovándolo.', '2024-12-15 11:00:00');
+(100, 30, 'El servidor de correo no responde desde las 8:00 de la mañana.', '2026-05-10 09:30:00'),
+(100, 20, 'He revisado el servidor. El servicio SMTP está caído. Reiniciando el servicio y verificando los logs.', '2026-05-10 10:15:00'),
+(100, 20, 'El servicio se reinició correctamente pero hay un problema con el certificado SSL. Estoy renovándolo.', '2026-05-10 11:00:00');
 
 -- Attachments
 INSERT INTO incident_attachments (incident_id, file_path, uploaded_by, uploaded_at)
 VALUES
-(100, 'attachments/demo-error-mail.pdf', 30, '2024-12-15 09:35:00');
+(100, 'attachments/demo-error-mail.pdf', 30, '2026-05-10 09:35:00');
 
 -- Notifications
 INSERT INTO notifications (user_id, type, title, body, read_at, created_at)

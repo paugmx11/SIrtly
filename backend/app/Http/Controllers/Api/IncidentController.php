@@ -67,6 +67,30 @@ class IncidentController extends Controller
         return null;
     }
 
+    private function notifyUsers(iterable $userIds, string $type, string $title, string $body): void
+    {
+        collect($userIds)
+            ->filter()
+            ->unique()
+            ->each(function ($targetId) use ($type, $title, $body) {
+                $exists = Notification::where('user_id', $targetId)
+                    ->where('type', $type)
+                    ->where('title', $title)
+                    ->where('body', $body)
+                    ->where('created_at', '>=', now()->subMinutes(5))
+                    ->exists();
+
+                if (!$exists) {
+                    Notification::create([
+                        'user_id' => $targetId,
+                        'type' => $type,
+                        'title' => $title,
+                        'body' => $body,
+                    ]);
+                }
+            });
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -224,13 +248,24 @@ class IncidentController extends Controller
             'priority' => $validated['priority'] ?? 'medium',
         ]);
 
+        // Reload with relations for response
+        $incident->load(['creator', 'assignee', 'status']);
+
+        $technicianRecipients = $this->technicianCandidates($user->company_id)->pluck('id');
+        $this->notifyUsers(
+            $technicianRecipients,
+            'incident_created:' . $incident->id,
+            'Nueva incidencia',
+            'Se ha creado: ' . $incident->title,
+        );
+
         if ($assignedTo) {
-            Notification::create([
-                'user_id' => $assignedTo,
-                'type' => 'incident',
-                'title' => 'Incidencia asignada',
-                'body' => 'Se te asignó: ' . $incident->title,
-            ]);
+            $this->notifyUsers(
+                [$assignedTo],
+                'incident_assigned:' . $incident->id,
+                'Incidencia asignada',
+                'Se te asignó: ' . $incident->title,
+            );
         }
 
         return response()->json(['incident' => $incident], 201);
@@ -292,14 +327,12 @@ class IncidentController extends Controller
             ->unique()
             ->reject(fn ($id) => $id === $user->id);
 
-        foreach ($targets as $targetId) {
-            Notification::create([
-                'user_id' => $targetId,
-                'type' => 'incident',
-                'title' => 'Estado actualizado',
-                'body' => 'La incidencia "' . $incident->title . '" cambió a ' . $status->name,
-            ]);
-        }
+        $this->notifyUsers(
+            $targets,
+            'incident_status:' . $incident->id,
+            'Estado actualizado',
+            'La incidencia "' . $incident->title . '" cambió a ' . $status->name,
+        );
 
         return response()->json(['incident' => $incident]);
     }
@@ -336,19 +369,20 @@ class IncidentController extends Controller
 
         $incident->save();
 
+        // Reload with relations for response
+        $incident->load(['creator', 'assignee', 'status']);
+
         $targets = collect([$incident->assigned_to, $incident->created_by])
             ->filter()
             ->unique()
             ->reject(fn ($id) => $id === $user->id);
 
-        foreach ($targets as $targetId) {
-            Notification::create([
-                'user_id' => $targetId,
-                'type' => 'incident',
-                'title' => 'Incidencia asignada',
-                'body' => 'Se te asignó: ' . $incident->title,
-            ]);
-        }
+        $this->notifyUsers(
+            $targets,
+            'incident_assigned:' . $incident->id,
+            'Incidencia asignada',
+            'Se te asignó: ' . $incident->title,
+        );
 
         return response()->json(['incident' => $incident]);
     }

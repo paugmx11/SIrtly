@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react'
 import './App.css'
 import PublicPortal from './pages/PublicPortal.jsx'
 import sirtlyLogo from './assets/Logo Sirtly.png'
@@ -67,6 +67,8 @@ const COLOR_PRESETS = [
   ['#166534', '#22C55E'],
 ]
 const SESSION_STORAGE_KEY = 'sirtly.session'
+const CLOSED_STATUS_NAMES = ['resuelta', 'cerrada']
+const ACTIVE_STATUS_NAMES = ['abierta', 'en_progreso']
 const ROLE_DEFAULT_VIEWS = {
   admin: 'admin-empresas',
   supervisor: 'sup-empresas',
@@ -74,6 +76,8 @@ const ROLE_DEFAULT_VIEWS = {
   empleado: 'emp-dashboard',
   tecnico: 'tec-dashboard',
 }
+
+bootstrapStoredBranding()
 
 function App() {
   const savedSession = readStoredSession()
@@ -92,6 +96,16 @@ function App() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
+  const [brandLogoSrc, setBrandLogoSrc] = useState(null)
+  const [brandFaviconSrc, setBrandFaviconSrc] = useState(null)
+
+  useLayoutEffect(() => {
+    const settings = savedSession.settings
+    if (settings) {
+      document.documentElement.style.setProperty('--app-brand-primary', settings.primary_color || '#2563eb')
+      document.documentElement.style.setProperty('--app-brand-secondary', settings.secondary_color || '#7c3aed')
+    }
+  }, [])
   const [passwordForm, setPasswordForm] = useState({
     current_password: '',
     new_password: '',
@@ -125,10 +139,109 @@ function App() {
   const brandPrimary = currentBranding?.primary_color || '#2563eb'
   const brandSecondary = currentBranding?.secondary_color || '#7c3aed'
   const brandName = currentBranding?.system_name?.trim() || 'Sirtly'
-  const brandLogo = currentBranding?.logo ? `${API_ROOT}/storage/${currentBranding.logo}` : null
-  const brandFavicon = currentBranding?.favicon ? `${API_ROOT}/storage/${currentBranding.favicon}` : null
+  const canUseNotifications = role !== 'supervisor'
+
+  const fetchProtectedAssetUrl = async (path) => {
+    const response = await fetch(`${API_BASE}${path}`, {
+      headers: {
+        Accept: '*/*',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('No se pudo cargar el archivo')
+    }
+
+    const blob = await response.blob()
+    return URL.createObjectURL(blob)
+  }
+
+  const openProtectedFile = async (path, fallbackName = 'archivo') => {
+    const response = await fetch(`${API_BASE}${path}`, {
+      headers: {
+        Accept: '*/*',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('No se pudo abrir el archivo')
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.target = '_blank'
+      anchor.rel = 'noreferrer'
+      anchor.download = fallbackName || 'archivo'
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
 
   useEffect(() => {
+    let active = true
+    let nextLogoUrl = null
+    let nextFaviconUrl = null
+
+    const loadBrandingAssets = async () => {
+      if (!token || !currentBranding) {
+        setBrandLogoSrc((previous) => {
+          if (previous) URL.revokeObjectURL(previous)
+          return null
+        })
+        setBrandFaviconSrc((previous) => {
+          if (previous) URL.revokeObjectURL(previous)
+          return null
+        })
+        return
+      }
+
+      try {
+        if (currentBranding.logo) {
+          nextLogoUrl = await fetchProtectedAssetUrl('/company-settings/asset/logo')
+        }
+        if (currentBranding.favicon) {
+          nextFaviconUrl = await fetchProtectedAssetUrl('/company-settings/asset/favicon')
+        }
+      } catch {
+        nextLogoUrl = null
+        nextFaviconUrl = null
+      }
+
+      if (!active) {
+        if (nextLogoUrl) URL.revokeObjectURL(nextLogoUrl)
+        if (nextFaviconUrl) URL.revokeObjectURL(nextFaviconUrl)
+        return
+      }
+
+      setBrandLogoSrc((previous) => {
+        if (previous) URL.revokeObjectURL(previous)
+        return nextLogoUrl
+      })
+      setBrandFaviconSrc((previous) => {
+        if (previous) URL.revokeObjectURL(previous)
+        return nextFaviconUrl
+      })
+    }
+
+    loadBrandingAssets()
+
+    return () => {
+      active = false
+    }
+  }, [token, currentBranding?.logo, currentBranding?.favicon])
+
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--app-brand-primary', brandPrimary)
+    document.documentElement.style.setProperty('--app-brand-secondary', brandSecondary)
+
     const pageTitle = currentBranding?.system_name?.trim() || 'Sirtly'
     document.title = pageTitle
 
@@ -138,8 +251,8 @@ function App() {
       link.setAttribute('rel', 'icon')
       document.head.appendChild(link)
     }
-    link.setAttribute('href', brandFavicon || sirtlyLogo)
-  }, [currentBranding, brandFavicon])
+    link.setAttribute('href', brandFaviconSrc || sirtlyLogo)
+  }, [currentBranding?.system_name, brandPrimary, brandSecondary, brandFaviconSrc])
 
   useEffect(() => {
     persistSession({
@@ -279,7 +392,11 @@ function App() {
       } else {
         updates.incidents = []
       }
-      setNotifications((await apiFetch('/notifications')).notifications || [])
+      if (canUseNotifications) {
+        setNotifications((await apiFetch('/notifications')).notifications || [])
+      } else {
+        setNotifications([])
+      }
     } catch (e) {
       // ignore
     }
@@ -322,6 +439,8 @@ function App() {
       comments: [],
       attachments: [],
     })
+    setBrandLogoSrc(null)
+    setBrandFaviconSrc(null)
     setToken('')
     clearStoredSession()
   }
@@ -439,11 +558,21 @@ function App() {
     }
   }
 
+  const deleteNotification = async (id) => {
+    try {
+      await apiFetch(`/notifications/${id}`, { method: 'DELETE' })
+      setNotifications((prev) => prev.filter((notification) => notification.id !== id))
+      notifySuccess('Notificación eliminada')
+    } catch {
+      notifyError('No se pudo eliminar la notificación')
+    }
+  }
+
   return (
     <div className="app" style={{ '--brand-primary': brandPrimary, '--brand-secondary': brandSecondary }}>
       <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar__brand">
-          <BrandLogo brandLogo={brandLogo} brandName={brandName} product={!brandLogo && brandName === 'Sirtly'} />
+          <BrandLogo brandLogo={brandLogoSrc} brandName={brandName} product={!brandLogoSrc && brandName === 'Sirtly'} />
           <div>
             <div className="brand-title">{brandName}</div>
             <div className="brand-sub">{ROLE_LABELS[role]}</div>
@@ -458,7 +587,7 @@ function App() {
               aria-current={activeKey === item.key ? 'page' : undefined}
               onClick={() => setView(item.key)}
             >
-              <span className={`icon icon--${item.icon}`} />
+              <span className="icon" aria-hidden="true">{resolveMenuIcon(item.icon)}</span>
               {item.label}
             </button>
           ))}
@@ -495,7 +624,7 @@ function App() {
             <div className="topbar__title">{resolveTitle(activeView)}</div>
           </div>
           <div className="topbar__actions">
-            <div className="notifications">
+            {canUseNotifications && <div className="notifications">
               <button
                 type="button"
                 className="bell"
@@ -524,14 +653,18 @@ function App() {
                         <div className="notif-body">{n.body}</div>
                         <div className="notif-meta">
                           <span>{formatDate(n.created_at)}</span>
-                          {!n.read_at && <button type="button" className="link" onClick={() => markNotificationRead(n.id)}>Marcar leído</button>}
+                          <div className="notif-meta__actions">
+                            {n.incident_id && <button type="button" className="link" onClick={() => openIncidentFromNotification(n, { role, setView, setSelectedIncidentId, setSelectedUserSource, markNotificationRead })}>Ver</button>}
+                            {!n.read_at && <button type="button" className="link" onClick={() => markNotificationRead(n.id)}>Marcar leído</button>}
+                            <button type="button" className="link link--danger" onClick={() => deleteNotification(n.id)}>Eliminar</button>
+                          </div>
                         </div>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
-            </div>
+            </div>}
             <div className="profile-menu">
               <button
                 type="button"
@@ -599,6 +732,8 @@ function App() {
             currentUser: user,
             notifySuccess,
             notifyError,
+            openProtectedFile,
+            fetchProtectedAssetUrl,
           })}
         </main>
         {passwordModalOpen && (
@@ -728,7 +863,7 @@ function resolveActiveKey(view, selectedUserSource) {
 }
 
 function renderView(view, role, onNavigate, ctx) {
-  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, runAction, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications, currentUser, notifyError } = ctx
+  const { data, setSelectedIncidentId, selectedIncidentId, apiFetch, runAction, loadAll, selectedUser, setSelectedUser, selectedUserSource, setSelectedUserSource, selectedCompany, setSelectedCompany, notifications, currentUser, notifyError, notifySuccess, openProtectedFile, fetchProtectedAssetUrl } = ctx
   if (role === 'admin') {
     if (view === 'admin-dashboard') return <AdminDashboard stats={data.statsSystem} incidents={data.incidents} />
     if (view === 'admin-estadisticas') return <AdminEstadisticas stats={data.statsSystem} />
@@ -799,27 +934,29 @@ function renderView(view, role, onNavigate, ctx) {
       onEdit={(id) => { setSelectedIncidentId(id); onNavigate('jefe-incidencias-edit') }}
       onDelete={(id) => runAction(async () => { if (!confirm('¿Eliminar incidencia?')) return false; await apiFetch(`/incidents/${id}`, { method: 'DELETE' }); await loadAll(); }, { successMessage: 'Incidencia eliminada correctamente' })}
     />
-    if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
+    if (view === 'jefe-incidencias-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} apiFetch={apiFetch} openProtectedFile={openProtectedFile} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('jefe-incidencias')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('jefe-incidencias'); })} />
     if (view === 'jefe-estadisticas') return <EstadisticasEmpresa statsCompany={data.statsCompany} byTechnician={data.byTechnician} />
-    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'POST', body: payload }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
+    if (view === 'jefe-config') return <ConfiguracionEmpresa settings={data.settings} assetLoader={fetchProtectedAssetUrl} onSave={(payload) => runAction(async () => { await apiFetch('/company-settings', { method: 'POST', body: payload }); await loadAll(); }, { successMessage: 'Configuración guardada correctamente' })} />
   }
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
     if (view === 'emp-mis') return <MisIncidencias incidents={data.incidents} onCreate={() => onNavigate('emp-crear')} onEdit={(id) => { setSelectedIncidentId(id); onNavigate('emp-edit'); }} />
-    if (view === 'emp-crear') return <CrearIncidencia notifyError={notifyError} settings={data.settings} onCreate={(payload, file) => runAction(async () => {
+    if (view === 'emp-crear') return <CrearIncidencia onBack={() => onNavigate('emp-mis')} notifyError={notifyError} settings={data.settings} onCreate={(payload, files) => runAction(async () => {
       const created = await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) })
-      if (file && created?.incident?.id) {
-        const formData = new FormData()
-        formData.append('file', file)
-        await apiFetch(`/incidents/${created.incident.id}/attachments`, { method: 'POST', body: formData })
+      if (files && files.length > 0 && created?.incident?.id) {
+        for (const file of files) {
+          const formData = new FormData()
+          formData.append('file', file)
+          await apiFetch(`/incidents/${created.incident.id}/attachments`, { method: 'POST', body: formData })
+        }
       }
       await loadAll()
       onNavigate('emp-mis')
     })} />
-    if (view === 'emp-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
+    if (view === 'emp-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} apiFetch={apiFetch} openProtectedFile={openProtectedFile} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
   }
   if (role === 'tecnico') {
-    if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} />
+    if (view === 'tec-dashboard') return <TecnicoDashboard incidents={data.incidents} currentUserId={currentUser?.id} />
     if (view === 'tec-disponibles') return <IncidenciasTecnico
       title="Incidencias disponibles"
       incidents={data.incidents}
@@ -847,13 +984,14 @@ function renderView(view, role, onNavigate, ctx) {
       onBack={() => onNavigate(selectedUserSource || 'tec-asignadas')}
       notifications={notifications}
       currentUserId={currentUser?.id}
+      openProtectedFile={openProtectedFile}
       onTakeOwnership={async (id) => {
         await runAction(async () => {
           await apiFetch(`/incidents/${id}/assign`, { method: 'PATCH' })
           await loadAll()
         }, { successMessage: 'Incidencia cogida correctamente' })
       }}
-      notifySuccess={ctx.notifySuccess}
+      notifySuccess={notifySuccess}
       notifyError={notifyError}
     />
   }
@@ -1048,8 +1186,8 @@ function JefeDashboard({ stats, incidents }) {
     { label: 'Empleados', value: stats?.employees || 0, icon: '👥', color: 'blue' },
     { label: 'Incidencias', value: stats?.incidents || 0, icon: '📄', color: 'purple' },
     { label: 'Abiertas', value: stats?.open || 0, icon: '•', color: 'gray' },
-    { label: 'En proceso', value: stats?.in_progress || 0, icon: '•', color: 'gray' },
-    { label: 'Resueltas', value: stats?.resolved || 0, icon: '✔', color: 'green' },
+    { label: 'En proceso', value: stats?.in_progress || 0, icon: '🕒', color: 'blue' },
+    { label: 'Cerradas', value: stats?.closed || 0, icon: '✔', color: 'green' },
   ]
   const rows = incidents.slice(0, 4).map((i) => ({
     title: i.title,
@@ -1071,9 +1209,9 @@ function JefeDashboard({ stats, incidents }) {
 
 function EmpleadoDashboard({ incidents }) {
   const cards = [
-    { label: 'Mis abiertas', value: incidents.filter((i) => i.status?.name === 'abierta').length, icon: '•', color: 'gray' },
-    { label: 'En proceso', value: incidents.filter((i) => i.status?.name === 'en_progreso').length, icon: '🕒', color: 'blue' },
-    { label: 'Resueltas', value: incidents.filter((i) => i.status?.name === 'resuelta').length, icon: '✔', color: 'green' },
+    { label: 'Mis abiertas', value: countIncidentsByStatus(incidents, ['abierta']), icon: '•', color: 'gray' },
+    { label: 'En proceso', value: countIncidentsByStatus(incidents, ['en_progreso']), icon: '🕒', color: 'blue' },
+    { label: 'Cerradas', value: countIncidentsByStatus(incidents, CLOSED_STATUS_NAMES), icon: '✔', color: 'green' },
   ]
   const rows = incidents.slice(0, 4).map((i) => ({
     title: i.title,
@@ -1093,13 +1231,14 @@ function EmpleadoDashboard({ incidents }) {
   )
 }
 
-function TecnicoDashboard({ incidents }) {
+function TecnicoDashboard({ incidents, currentUserId }) {
+  const assignedToCurrentUser = incidents.filter((incident) => incident.assigned_to === currentUserId)
   const cards = [
-    { label: 'Asignadas', value: incidents.filter((i) => i.assigned_to).length, icon: '📄', color: 'blue' },
-    { label: 'En proceso', value: incidents.filter((i) => i.status?.name === 'en_progreso').length, icon: '•', color: 'gray' },
-    { label: 'Resueltas', value: incidents.filter((i) => i.status?.name === 'resuelta').length, icon: '✔', color: 'green' },
+    { label: 'Asignadas', value: assignedToCurrentUser.length, icon: '📄', color: 'blue' },
+    { label: 'En proceso', value: countIncidentsByStatus(assignedToCurrentUser, ['en_progreso']), icon: '🕒', color: 'blue' },
+    { label: 'Cerradas', value: countIncidentsByStatus(assignedToCurrentUser, CLOSED_STATUS_NAMES), icon: '✔', color: 'green' },
   ]
-  const rows = incidents.slice(0, 4).map((i) => ({
+  const rows = assignedToCurrentUser.slice(0, 4).map((i) => ({
     title: i.title,
     person: i.creator?.name || '-',
     priority: labelPriority(i.priority),
@@ -1631,7 +1770,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
   }, [incidents])
 
   const rows = incidents.filter((i) => {
-    if (filterMode === 'available') return i.assigned_to == null || !i.assignee
+    if (filterMode === 'available') return isIncidentAvailableForTechnician(i)
     return i.assigned_to === currentUserId
   }).filter((i) => {
     const matchesSearch = [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name]
@@ -1712,22 +1851,34 @@ function IncidenciasAsignadas({ incidents, currentUserId, onTake, onManage }) {
   )
 }
 
-function CrearIncidencia({ onCreate, settings, notifyError }) {
+function CrearIncidencia({ onCreate, settings, notifyError, onBack }) {
   const formId = useId()
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const categories = settings?.categories || []
+  
+  const handleFileSelect = (e) => {
+    const newFiles = Array.from(e.target.files || [])
+    setFiles([...files, ...newFiles])
+    e.target.value = ''
+  }
+
+  const removeFile = (index) => {
+    setFiles(files.filter((_, i) => i !== index))
+  }
+
   const submit = () => {
     const error = validateIncidentForm(form)
     if (error) {
       notifyError?.(error)
       return
     }
-    onCreate(form, file)
+    onCreate(form, files)
   }
+
   return (
     <div className="panel form">
-      <h3>Crear incidencia</h3>
+      <FormHeader title="Crear incidencia" onBack={onBack} />
       <label htmlFor={`${formId}-title`}>Título</label>
       <input id={`${formId}-title`} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Describe brevemente el problema" />
       <label htmlFor={`${formId}-description`}>Descripción</label>
@@ -1747,16 +1898,32 @@ function CrearIncidencia({ onCreate, settings, notifyError }) {
           <option key={p.value} value={p.value}>{p.label}</option>
         ))}
       </select>
-      <label htmlFor={`${formId}-attachment`}>Adjuntar archivo (opcional)</label>
-      <input id={`${formId}-attachment`} type="file" aria-label="Adjuntar archivo" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+      <label htmlFor={`${formId}-attachment`}>Adjuntos (opcional)</label>
+      <div className="upload-row">
+        <input id={`${formId}-attachment`} type="file" multiple aria-label="Adjuntar archivos" onChange={handleFileSelect} />
+      </div>
+      {files.length > 0 && (
+        <>
+          <label>Archivos a subir ({files.length})</label>
+          <ul className="file-list file-list--stacked">
+            {files.map((file, index) => (
+              <li key={`${index}-${file.name}`}>
+                <button type="button" className="file-list__link" disabled>{file.name}</button>
+                <button type="button" className="icon-btn icon-btn--danger" aria-label={`Eliminar archivo ${file.name}`} onClick={() => removeFile(index)}>🗑️</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <button className="btn btn--primary" onClick={submit}>Crear incidencia</button>
     </div>
   )
 }
 
-function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
+function EditarIncidencia({ incident, onBack, onSave, settings, notifyError, apiFetch, openProtectedFile }) {
   const formId = useId()
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
+  const [attachments, setAttachments] = useState([])
   useEffect(() => {
     if (incident) {
       setForm({
@@ -1767,6 +1934,24 @@ function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
       })
     }
   }, [incident])
+
+  useEffect(() => {
+    const loadAttachments = async () => {
+      if (!incident || !apiFetch) {
+        setAttachments([])
+        return
+      }
+
+      try {
+        const response = await apiFetch(`/incidents/${incident.id}/attachments`)
+        setAttachments(response.attachments || [])
+      } catch {
+        setAttachments([])
+      }
+    }
+
+    loadAttachments()
+  }, [incident?.id])
 
   if (!incident) return <div className="panel">Selecciona una incidencia</div>
 
@@ -1804,6 +1989,20 @@ function EditarIncidencia({ incident, onBack, onSave, settings, notifyError }) {
         <option value="high">Alta</option>
         <option value="urgent">Crítica</option>
       </select>
+      {attachments.length > 0 && (
+        <>
+          <label>Adjuntos</label>
+          <ul className="file-list file-list--stacked">
+            {attachments.map((attachment) => (
+              <li key={attachment.id}>
+                <button type="button" className="file-list__link" onClick={() => openProtectedFile(`/incidents/${incident.id}/attachments/${attachment.id}/download`, attachment.file_name || attachment.file_path)}>
+                  {attachment.file_name || attachment.file_path}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <button className="btn btn--primary" onClick={submit}>Guardar cambios</button>
     </div>
   )
@@ -1895,7 +2094,7 @@ function EditarUsuario({ user, onBack, onSave, settings, notifyError }) {
   )
 }
 
-function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onTakeOwnership, notifySuccess, notifyError, onBack }) {
+function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onTakeOwnership, notifySuccess, notifyError, onBack, openProtectedFile }) {
   const formId = useId()
   const [status, setStatus] = useState('open')
   const [comment, setComment] = useState('')
@@ -1962,10 +2161,7 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
 
   const deleteAttachment = async (attachmentId) => {
     try {
-      await apiFetch(`/incidents/${incident.id}/attachments?_action=delete&attachment_id=${attachmentId}`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      })
+      await apiFetch(`/incidents/${incident.id}/attachments/${attachmentId}`, { method: 'DELETE' })
       const a = await apiFetch(`/incidents/${incident.id}/attachments`)
       setAttachments(a.attachments || [])
       notifySuccess?.('Adjunto eliminado correctamente')
@@ -2013,7 +2209,6 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
             <select id={`${formId}-status`} value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="open">Abierta</option>
               <option value="in_progress">En proceso</option>
-              <option value="resolved">Resuelta</option>
               <option value="closed">Cerrada</option>
             </select>
             <button className="btn btn--success" onClick={updateStatus}>Guardar estado</button>
@@ -2023,7 +2218,9 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
         <ul className="file-list">
           {attachments.map((a) => (
             <li key={a.id}>
-              <a href={a.url || `${API_ROOT}/storage/${a.file_path}`} target="_blank" rel="noreferrer">{a.file_name || a.file_path}</a>
+              <button type="button" className="file-list__link" onClick={() => openProtectedFile(`/incidents/${incident.id}/attachments/${a.id}/download`, a.file_name || a.file_path)}>
+                {a.file_name || a.file_path}
+              </button>
               <button type="button" className="icon-btn icon-btn--danger" aria-label={`Eliminar adjunto ${a.file_name || a.file_path}`} onClick={() => deleteAttachment(a.id)}>🗑️</button>
             </li>
           ))}
@@ -2104,7 +2301,7 @@ function EstadisticasEmpresa({ statsCompany, byTechnician }) {
   const statusRows = [
     { label: 'Abiertas', value: statsCompany?.open || 0 },
     { label: 'En proceso', value: statsCompany?.in_progress || 0 },
-    { label: 'Resueltas', value: statsCompany?.resolved || 0 },
+    { label: 'Cerradas', value: statsCompany?.closed || 0 },
   ]
 
   return (
@@ -2173,7 +2370,7 @@ function EstadisticasEmpresa({ statsCompany, byTechnician }) {
   )
 }
 
-function ConfiguracionEmpresa({ settings, onSave }) {
+function ConfiguracionEmpresa({ settings, onSave, assetLoader }) {
   const formId = useId()
   const [form, setForm] = useState({
     primary_color: settings?.primary_color || '#2D61E5',
@@ -2189,8 +2386,8 @@ function ConfiguracionEmpresa({ settings, onSave }) {
   })
   const [logoFile, setLogoFile] = useState(null)
   const [faviconFile, setFaviconFile] = useState(null)
-  const [logoPreview, setLogoPreview] = useState(settings?.logo ? `${API_ROOT}/storage/${settings.logo}` : '')
-  const [faviconPreview, setFaviconPreview] = useState(settings?.favicon ? `${API_ROOT}/storage/${settings.favicon}` : '')
+  const [logoPreview, setLogoPreview] = useState('')
+  const [faviconPreview, setFaviconPreview] = useState('')
 
   useEffect(() => {
     if (settings) {
@@ -2206,10 +2403,51 @@ function ConfiguracionEmpresa({ settings, onSave }) {
         departments: (settings.departments || []).join(', '),
         specialties: (settings.specialties || []).join(', '),
       })
-      setLogoPreview(settings.logo ? `${API_ROOT}/storage/${settings.logo}` : '')
-      setFaviconPreview(settings.favicon ? `${API_ROOT}/storage/${settings.favicon}` : '')
     }
   }, [settings])
+
+  useEffect(() => {
+    let active = true
+    let nextLogoUrl = ''
+    let nextFaviconUrl = ''
+
+    const loadPreviews = async () => {
+      if (!settings || !assetLoader) {
+        setLogoPreview('')
+        setFaviconPreview('')
+        return
+      }
+
+      try {
+        if (settings.logo) {
+          nextLogoUrl = await assetLoader('/company-settings/asset/logo')
+        }
+        if (settings.favicon) {
+          nextFaviconUrl = await assetLoader('/company-settings/asset/favicon')
+        }
+      } catch {
+        nextLogoUrl = ''
+        nextFaviconUrl = ''
+      }
+
+      if (!active) return
+
+      setLogoPreview((previous) => {
+        if (previous && previous.startsWith('blob:')) URL.revokeObjectURL(previous)
+        return nextLogoUrl
+      })
+      setFaviconPreview((previous) => {
+        if (previous && previous.startsWith('blob:')) URL.revokeObjectURL(previous)
+        return nextFaviconUrl
+      })
+    }
+
+    loadPreviews()
+
+    return () => {
+      active = false
+    }
+  }, [settings?.logo, settings?.favicon])
 
   const handleSave = () => {
     const payload = new FormData()
@@ -2279,7 +2517,7 @@ function ConfiguracionEmpresa({ settings, onSave }) {
               setLogoFile(file)
               if (file) setLogoPreview(URL.createObjectURL(file))
             }} />
-            {logoPreview && <img className="branding-upload-preview" src={logoPreview} alt="Vista previa del logo" />}
+            {logoPreview && <img className="branding-upload-preview" src={logoPreview} alt="Logo actual" />}
           </div>
           <label htmlFor={`${formId}-favicon`}>Favicon</label>
           <div className="branding-upload-row">
@@ -2288,16 +2526,10 @@ function ConfiguracionEmpresa({ settings, onSave }) {
               setFaviconFile(file)
               if (file) setFaviconPreview(URL.createObjectURL(file))
             }} />
-            {faviconPreview && <img className="branding-upload-preview branding-upload-preview--small" src={faviconPreview} alt="Vista previa del favicon" />}
+            {faviconPreview && <img className="branding-upload-preview branding-upload-preview--small" src={faviconPreview} alt="Favicon actual" />}
           </div>
-          {faviconPreview && <img className="favicon-preview" src={faviconPreview} alt="Favicon" />}
           <div className="config-note">
             El logo y la identidad visual se aplican en los paneles de jefe de empresa, técnico y empleado.
-          </div>
-          <div className="config-highlight">
-            <span>Sidebar personalizada</span>
-            <span>Botones con color de marca</span>
-            <span>Favicon propio</span>
           </div>
         </div>
         <div className="panel">
@@ -2350,6 +2582,26 @@ function sanitizePhone(value) {
   return cleaned.startsWith('+34') ? cleaned : cleaned.replace(/^\+/, '')
 }
 
+function bootstrapStoredBranding() {
+  if (typeof window === 'undefined') return
+
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY)
+    if (!raw) return
+
+    const session = JSON.parse(raw)
+    const role = session?.role
+    const settings = session?.settings
+
+    if (!settings || !['jefe_empresa', 'tecnico', 'empleado'].includes(role)) return
+
+    document.documentElement.style.setProperty('--app-brand-primary', settings.primary_color || '#2563eb')
+    document.documentElement.style.setProperty('--app-brand-secondary', settings.secondary_color || '#7c3aed')
+  } catch {
+    // ignore bootstrap errors and let React hydrate normally
+  }
+}
+
 function readStoredSession() {
   if (typeof window === 'undefined') return {}
   try {
@@ -2372,6 +2624,8 @@ function persistSession(session) {
 function clearStoredSession() {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(SESSION_STORAGE_KEY)
+  document.documentElement.style.setProperty('--app-brand-primary', '#2563eb')
+  document.documentElement.style.setProperty('--app-brand-secondary', '#7c3aed')
 }
 
 function defaultViewForRole(role) {
@@ -2390,6 +2644,38 @@ function roleMenuFor(role) {
   if (role === 'jefe_empresa') return JEFE_MENU
   if (role === 'empleado') return EMPLEADO_MENU
   return TECNICO_MENU
+}
+
+function countIncidentsByStatus(incidents, statuses) {
+  return incidents.filter((incident) => statuses.includes(incident.status?.name)).length
+}
+
+function isIncidentAvailableForTechnician(incident) {
+  if (!incident) return false
+  if (incident.assigned_to || incident.assignee) return false
+  return !CLOSED_STATUS_NAMES.includes(incident.status?.name)
+}
+
+async function openIncidentFromNotification(notification, { role, setView, setSelectedIncidentId, setSelectedUserSource, markNotificationRead }) {
+  if (!notification?.incident_id) return
+
+  await markNotificationRead(notification.id)
+  setSelectedIncidentId(notification.incident_id)
+
+  if (role === 'jefe_empresa') {
+    setView('jefe-incidencias-edit')
+    return
+  }
+
+  if (role === 'tecnico') {
+    setSelectedUserSource('tec-asignadas')
+    setView('tec-gestionar')
+    return
+  }
+
+  if (role === 'empleado') {
+    setView('emp-edit')
+  }
 }
 
 function normalizePhoneForSave(value) {
@@ -2750,7 +3036,7 @@ function CrearTecnico({ onBack, onCreate, settings, notifyError }) {
 
 function labelStatus(name) {
   if (name === 'en_progreso') return 'En proceso'
-  if (name === 'resuelta') return 'Resuelta'
+  if (name === 'resuelta') return 'Cerrada'
   if (name === 'cerrada') return 'Cerrada'
   return 'Abierta'
 }
@@ -2758,8 +3044,25 @@ function labelStatus(name) {
 function statusClass(label) {
   if (label === 'Abierta') return 'abierta'
   if (label === 'En proceso') return 'proceso'
-  if (label === 'Resuelta') return 'resuelta'
+  if (label === 'Cerrada') return 'cerrada'
   return 'cerrada'
+}
+
+function resolveMenuIcon(iconName) {
+  const iconMap = {
+    'building': '🏢',
+    'briefcase': '💼',
+    'shield': '🛡️',
+    'eye': '👁️',
+    'chart': '📊',
+    'grid': '🎯',
+    'users': '👥',
+    'tool': '🔧',
+    'file': '📄',
+    'plus': '➕',
+    'settings': '⚙️',
+  }
+  return iconMap[iconName] || '◾'
 }
 
 function labelPriority(p) {
@@ -2778,7 +3081,13 @@ function priorityClass(p) {
 
 function formatDate(date) {
   if (!date) return '-'
-  return String(date).slice(0, 10)
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return String(date).slice(0, 10)
+  return new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(parsed)
 }
 
 function splitCsv(val) {

@@ -48,8 +48,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/incidents/{incidentId}/attachments/{attachmentId}', [AttachmentController::class, 'destroy']);
     Route::post('/incidents/{incidentId}/attachments/{attachmentId}', [AttachmentController::class, 'destroy']);
     Route::post('/incidents/{incidentId}/attachments/{attachmentId}/delete', [AttachmentController::class, 'destroy']);
+    Route::get('/incidents/{incidentId}/attachments/{attachmentId}/download', [AttachmentController::class, 'download']);
 
     Route::get('/company-settings', [CompanySettingsController::class, 'show']);
+    Route::get('/company-settings/asset/{type}', [CompanySettingsController::class, 'asset']);
     Route::put('/company-settings', [CompanySettingsController::class, 'update']);
     Route::post('/company-settings', [CompanySettingsController::class, 'update']);
 
@@ -62,4 +64,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 });

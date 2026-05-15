@@ -13,6 +13,13 @@ use Illuminate\Support\Facades\DB;
 
 class StatsController extends Controller
 {
+    private function countStatuses($query, array $names): int
+    {
+        return (clone $query)->whereHas('status', function ($statusQuery) use ($names) {
+            $statusQuery->whereIn('name', $names);
+        })->count();
+    }
+
     public function system(Request $request)
     {
         $role = $request->user()->role?->name;
@@ -21,7 +28,7 @@ class StatsController extends Controller
         }
 
         $open = IncidentStatus::where('name', 'abierta')->value('id');
-        $resolved = IncidentStatus::where('name', 'resuelta')->value('id');
+        $closedIds = IncidentStatus::whereIn('name', ['resuelta', 'cerrada'])->pluck('id');
 
         $assignmentModes = CompanySetting::select('assignment_mode', DB::raw('COUNT(*) as total'))
             ->groupBy('assignment_mode')
@@ -39,7 +46,7 @@ class StatsController extends Controller
             'companies_specialty_assignment' => $assignmentModes->get('specialty', 0),
             'companies_manual_assignment' => $assignmentModes->get('manual', 0),
             'open' => $open ? Incident::where('status_id', $open)->count() : 0,
-            'resolved' => $resolved ? Incident::where('status_id', $resolved)->count() : 0,
+            'closed' => $closedIds->isNotEmpty() ? Incident::whereIn('status_id', $closedIds)->count() : 0,
             'textocambios' => 'Se han retirado las estadísticas de incidencias para administradores y supervisores, y se han añadido nuevos parámetros de configuración de empresa.',
         ]);
     }
@@ -52,14 +59,14 @@ class StatsController extends Controller
             return response()->json(['message' => 'Not authorized.'], 403);
         }
 
-        $statuses = IncidentStatus::pluck('id', 'name');
+        $query = Incident::where('company_id', $user->company_id);
 
         return response()->json([
             'employees' => User::where('company_id', $user->company_id)->count(),
-            'incidents' => Incident::where('company_id', $user->company_id)->count(),
-            'open' => $statuses->has('abierta') ? Incident::where('company_id', $user->company_id)->where('status_id', $statuses['abierta'])->count() : 0,
-            'in_progress' => $statuses->has('en_progreso') ? Incident::where('company_id', $user->company_id)->where('status_id', $statuses['en_progreso'])->count() : 0,
-            'resolved' => $statuses->has('resuelta') ? Incident::where('company_id', $user->company_id)->where('status_id', $statuses['resuelta'])->count() : 0,
+            'incidents' => (clone $query)->count(),
+            'open' => $this->countStatuses($query, ['abierta']),
+            'in_progress' => $this->countStatuses($query, ['en_progreso']),
+            'closed' => $this->countStatuses($query, ['resuelta', 'cerrada']),
         ]);
     }
 

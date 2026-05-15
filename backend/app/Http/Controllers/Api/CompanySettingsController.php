@@ -10,12 +10,17 @@ use Illuminate\Validation\Rule;
 
 class CompanySettingsController extends Controller
 {
+    private function authorizedRoles(): array
+    {
+        return ['jefe_empresa', 'tecnico', 'empleado'];
+    }
+
     public function show(Request $request)
     {
         $user = $request->user();
         $role = $user->role ? $user->role->name : null;
 
-        if (!in_array($role, ['jefe_empresa', 'tecnico', 'empleado'], true)) {
+        if (!in_array($role, $this->authorizedRoles(), true)) {
             return response()->json(['message' => 'Not authorized.'], 403);
         }
 
@@ -94,5 +99,34 @@ class CompanySettingsController extends Controller
             'message' => 'Settings updated successfully.',
             'settings' => $settings->fresh(),
         ]);
+    }
+
+    public function asset(Request $request, string $type)
+    {
+        $user = $request->user();
+        $role = $user->role ? $user->role->name : null;
+
+        if (!in_array($role, $this->authorizedRoles(), true)) {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        if (!in_array($type, ['logo', 'favicon'], true)) {
+            abort(404);
+        }
+
+        $settings = CompanySetting::where('company_id', $user->company_id)->firstOrFail();
+        $path = $settings->{$type};
+
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response(
+            $path,
+            basename($path),
+            [
+                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            ],
+        );
     }
 }

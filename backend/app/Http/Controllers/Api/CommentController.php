@@ -10,6 +10,30 @@ use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
+    private function notifyUsers(iterable $userIds, string $type, string $title, string $body): void
+    {
+        collect($userIds)
+            ->filter()
+            ->unique()
+            ->each(function ($targetId) use ($type, $title, $body) {
+                $exists = Notification::where('user_id', $targetId)
+                    ->where('type', $type)
+                    ->where('title', $title)
+                    ->where('body', $body)
+                    ->where('created_at', '>=', now()->subMinutes(5))
+                    ->exists();
+
+                if (!$exists) {
+                    Notification::create([
+                        'user_id' => $targetId,
+                        'type' => $type,
+                        'title' => $title,
+                        'body' => $body,
+                    ]);
+                }
+            });
+    }
+
     public function index(Request $request, int $id)
     {
         $user = $request->user();
@@ -50,14 +74,12 @@ class CommentController extends Controller
             ->unique()
             ->reject(fn ($id) => $id === $user->id);
 
-        foreach ($targets as $targetId) {
-            Notification::create([
-                'user_id' => $targetId,
-                'type' => 'comment',
-                'title' => 'Nuevo comentario',
-                'body' => 'Nuevo comentario en: ' . $incident->title,
-            ]);
-        }
+        $this->notifyUsers(
+            $targets,
+            'comment:' . $incident->id,
+            'Nuevo comentario',
+            'Nuevo comentario en: ' . $incident->title,
+        );
 
         return response()->json(['comment' => $comment], 201);
     }

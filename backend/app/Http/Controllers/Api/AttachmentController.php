@@ -104,4 +104,28 @@ class AttachmentController extends Controller
 
         return response()->json(['message' => 'Attachment deleted successfully.']);
     }
+
+    public function download(Request $request, int $incidentId, int $attachmentId)
+    {
+        $user = $request->user();
+        $incident = Incident::findOrFail($incidentId);
+
+        if ($user->role?->name !== 'admin' && $user->role?->name !== 'supervisor' && $incident->company_id !== $user->company_id) {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        $attachment = IncidentAttachment::where('incident_id', $incident->id)->findOrFail($attachmentId);
+
+        if (!Storage::disk('public')->exists($attachment->file_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response(
+            $attachment->file_path,
+            basename($attachment->file_path),
+            [
+                'Content-Disposition' => 'inline; filename="' . basename($attachment->file_path) . '"',
+            ],
+        );
+    }
 }
