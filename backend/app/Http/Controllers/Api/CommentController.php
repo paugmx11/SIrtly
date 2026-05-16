@@ -83,4 +83,46 @@ class CommentController extends Controller
 
         return response()->json(['comment' => $comment], 201);
     }
+
+    public function update(Request $request, int $id, int $commentId)
+    {
+        $user = $request->user();
+        $incident = Incident::findOrFail($id);
+        $comment = Comment::where('incident_id', $incident->id)->findOrFail($commentId);
+
+        if ($user->role?->name !== 'admin' && $user->role?->name !== 'supervisor' && $incident->company_id !== $user->company_id) {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        if ($comment->user_id !== $user->id && $user->role?->name !== 'admin' && $user->role?->name !== 'supervisor') {
+            return response()->json(['message' => 'Only the author can edit this comment.'], 403);
+        }
+
+        $validated = $request->validate([
+            'comment' => ['required', 'string'],
+        ]);
+
+        $comment->update(['comment' => $validated['comment']]);
+
+        return response()->json(['comment' => $comment]);
+    }
+
+    public function destroy(Request $request, int $id, int $commentId)
+    {
+        $user = $request->user();
+        $incident = Incident::findOrFail($id);
+        $comment = Comment::where('incident_id', $incident->id)->findOrFail($commentId);
+
+        if ($user->role?->name !== 'admin' && $user->role?->name !== 'supervisor' && $incident->company_id !== $user->company_id) {
+            return response()->json(['message' => 'Not authorized.'], 403);
+        }
+
+        if ($comment->user_id !== $user->id && $user->role?->name !== 'admin' && $user->role?->name !== 'supervisor') {
+            return response()->json(['message' => 'Only the author can delete this comment.'], 403);
+        }
+
+        $comment->delete();
+
+        return response()->json(['message' => 'Comment deleted successfully.']);
+    }
 }

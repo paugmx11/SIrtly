@@ -9,6 +9,17 @@ class IncidentAttachment extends Model
 {
     protected $table = 'incident_attachments';
 
+    protected static function booted(): void
+    {
+        static::deleting(function (IncidentAttachment $attachment) {
+            // Limpieza física: si se elimina el registro, borrar el archivo del storage.
+            // (El controller ya borra, pero esto protege contra eliminaciones directas.)
+            if ($attachment->file_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($attachment->file_path);
+            }
+        });
+    }
+
     protected $fillable = [
         'incident_id',
         'file_path',

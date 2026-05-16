@@ -170,6 +170,14 @@
   letter-spacing: -0.055em;
 }
 
+.landing__sirtly-gradient {
+  background: linear-gradient(135deg, #2D61E5 0%, #7C3AED 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
 .landing__hero-copy p {
   max-width: 480px;
   margin: 0;

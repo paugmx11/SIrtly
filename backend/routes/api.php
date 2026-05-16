@@ -42,6 +42,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/incidents/{id}/comments', [CommentController::class, 'index']);
     Route::post('/incidents/{id}/comments', [CommentController::class, 'store']);
+    Route::patch('/incidents/{id}/comments/{commentId}', [CommentController::class, 'update']);
+    Route::delete('/incidents/{id}/comments/{commentId}', [CommentController::class, 'destroy']);
 
     Route::get('/incidents/{id}/attachments', [AttachmentController::class, 'index']);
     Route::post('/incidents/{id}/attachments', [AttachmentController::class, 'store']);

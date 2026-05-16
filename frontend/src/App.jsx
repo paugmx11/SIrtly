@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react'
 import './App.css'
 import PublicPortal from './pages/PublicPortal.jsx'
 import sirtlyLogo from './assets/Logo Sirtly.png'
+import { usePagination } from './hooks.js'
 
 const ROLE_LABELS = {
   admin: 'Administrador',
@@ -941,18 +942,34 @@ function renderView(view, role, onNavigate, ctx) {
   if (role === 'empleado') {
     if (view === 'emp-dashboard') return <EmpleadoDashboard incidents={data.incidents} />
     if (view === 'emp-mis') return <MisIncidencias incidents={data.incidents} onCreate={() => onNavigate('emp-crear')} onEdit={(id) => { setSelectedIncidentId(id); onNavigate('emp-edit'); }} />
-    if (view === 'emp-crear') return <CrearIncidencia onBack={() => onNavigate('emp-mis')} notifyError={notifyError} settings={data.settings} onCreate={(payload, files) => runAction(async () => {
-      const created = await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) })
-      if (files && files.length > 0 && created?.incident?.id) {
-        for (const file of files) {
-          const formData = new FormData()
-          formData.append('file', file)
-          await apiFetch(`/incidents/${created.incident.id}/attachments`, { method: 'POST', body: formData })
+if (view === 'emp-crear') return <CrearIncidencia
+      onBack={() => onNavigate('emp-mis')}
+      notifyError={notifyError}
+      settings={data.settings}
+      onCreate={(payload, files) => runAction(async () => {
+        await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) })
+
+        // Adjuntos (opcional)
+        if (files && files.length > 0) {
+          // API puede devolver la incidencia como created.incident.id o como created.incident_id
+          const created = await apiFetch('/incidents', { method: 'POST', body: JSON.stringify(payload) }).catch(() => null)
+          const incidentId = created?.incident?.id || created?.incident_id || created?.id
+
+          if (incidentId) {
+            for (const file of files) {
+              const formData = new FormData()
+              formData.append('file', file)
+              await apiFetch(`/incidents/${incidentId}/attachments`, { method: 'POST', body: formData })
+            }
+          }
         }
-      }
-      await loadAll()
-      onNavigate('emp-mis')
-    })} />
+
+        await loadAll()
+        onNavigate('emp-mis')
+      }, { successMessage: 'Incidencia creada correctamente' })}
+    />
+    
+    
     if (view === 'emp-edit') return <EditarIncidencia notifyError={notifyError} settings={data.settings} apiFetch={apiFetch} openProtectedFile={openProtectedFile} incident={data.incidents.find((i) => i.id === selectedIncidentId)} onBack={() => onNavigate('emp-mis')} onSave={(payload) => runAction(async () => { await apiFetch(`/incidents/${selectedIncidentId}`, { method: 'PUT', body: JSON.stringify(payload) }); await loadAll(); onNavigate('emp-mis'); })} />
   }
   if (role === 'tecnico') {
@@ -1259,6 +1276,7 @@ function TecnicoDashboard({ incidents, currentUserId }) {
 function EmpresasList({ data, readonly, onCreate, onEdit }) {
   const [search, setSearch] = useState('')
   const rows = data.filter((c) => [c.name, c.cif, c.email, c.phone].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1282,7 +1300,7 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((c) => (
+          {pagination.currentItems.map((c) => (
             <tr key={c.id}>
               <td>{c.name}</td>
               <td>{c.cif || '-'}</td>
@@ -1300,6 +1318,7 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1307,6 +1326,7 @@ function EmpresasList({ data, readonly, onCreate, onEdit }) {
 function JefesList({ users, onCreate, onEdit, onDelete }) {
   const [search, setSearch] = useState('')
   const rows = users.filter((u) => u.role?.name === 'jefe_empresa').filter((u) => [u.name, u.last_name, u.email, u.phone, u.company?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1329,7 +1349,7 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {pagination.currentItems.map((r) => (
             <tr key={r.id}>
               <td>{r.name}</td>
               <td>{r.last_name}</td>
@@ -1347,6 +1367,7 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1354,6 +1375,7 @@ function JefesList({ users, onCreate, onEdit, onDelete }) {
 function AdminsList({ users, onCreate, onEdit, onDelete }) {
   const [search, setSearch] = useState('')
   const rows = users.filter((u) => u.role?.name === 'admin').filter((u) => [u.name, u.last_name, u.email].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1374,7 +1396,7 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {pagination.currentItems.map((r) => (
             <tr key={r.id}>
               <td>{r.name}</td>
               <td>{r.last_name}</td>
@@ -1389,6 +1411,7 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1396,6 +1419,7 @@ function AdminsList({ users, onCreate, onEdit, onDelete }) {
 function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
   const [search, setSearch] = useState('')
   const rows = users.filter((u) => u.role?.name === 'supervisor').filter((u) => [u.name, u.last_name, u.email].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1416,7 +1440,7 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {pagination.currentItems.map((r) => (
             <tr key={r.id}>
               <td>{r.name}</td>
               <td>{r.last_name}</td>
@@ -1431,6 +1455,7 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1438,6 +1463,7 @@ function SupervisoresList({ users, onCreate, onEdit, onDelete }) {
 function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
   const [search, setSearch] = useState('')
   const rows = users.filter((u) => u.role?.name === 'empleado').filter((u) => [u.name, u.last_name, u.email, u.department].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1459,7 +1485,7 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {pagination.currentItems.map((r) => (
             <tr key={r.id}>
               <td>{r.name}</td>
               <td>{r.last_name}</td>
@@ -1475,6 +1501,7 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1482,6 +1509,7 @@ function EmpleadosList({ users, onCreate, onEdit, onDelete }) {
 function TecnicosList({ users, onCreate, onEdit, onDelete }) {
   const [search, setSearch] = useState('')
   const rows = users.filter((u) => u.role?.name === 'tecnico').filter((u) => [u.name, u.last_name, u.email, u.specialty].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1503,7 +1531,7 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {pagination.currentItems.map((r) => (
             <tr key={r.id}>
               <td>{r.name}</td>
               <td>{r.last_name}</td>
@@ -1519,6 +1547,7 @@ function TecnicosList({ users, onCreate, onEdit, onDelete }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1531,7 +1560,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
   const [assignmentModalIncidentId, setAssignmentModalIncidentId] = useState(null)
 
   const filteredIncidents = incidents.filter((i) => [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
-
+  const pagination = usePagination(filteredIncidents)
   const assignmentIncident = filteredIncidents.find((incident) => incident.id === assignmentModalIncidentId) || null
 
   const handleAssign = async (incident) => {
@@ -1578,7 +1607,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
           </tr>
         </thead>
         <tbody>
-          {filteredIncidents.map((i) => {
+          {pagination.currentItems.map((i) => {
             const isPending = Boolean(pendingAssignments[i.id])
             const isConfirmed = Boolean(confirmedAssignments[i.id])
             const selectedValue = selectedTechnicians[i.id] ?? (i.assigned_to ? String(i.assigned_to) : '')
@@ -1627,6 +1656,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
         </tbody>
       </table>
       <div className="panel__footer">{filteredIncidents.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
 
       {assignmentIncident && (
         <div className="assignment-modal-overlay" role="presentation" onClick={() => {
@@ -1715,6 +1745,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
 function MisIncidencias({ incidents, onCreate, onEdit }) {
   const [search, setSearch] = useState('')
   const rows = incidents.filter((i) => [i.title, i.description, i.category, i.creator?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const pagination = usePagination(rows)
   return (
     <div className="panel">
       <div className="panel__header">
@@ -1736,7 +1767,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((i) => (
+          {pagination.currentItems.map((i) => (
             <tr key={i.id}>
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
@@ -1751,6 +1782,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1783,6 +1815,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
 
     return matchesSearch && matchesStatus && matchesPriority
   })
+  const pagination = usePagination(rows)
 
   return (
     <div className="panel">
@@ -1817,7 +1850,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
           </tr>
         </thead>
         <tbody>
-          {rows.map((i) => (
+          {pagination.currentItems.map((i) => (
             <tr key={i.id}>
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
@@ -1834,6 +1867,7 @@ function IncidenciasTecnico({ title, incidents, currentUserId, filterMode, onTak
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
+      {pagination.showPagination && <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} canGoNext={pagination.canGoNext} canGoPrev={pagination.canGoPrev} onPrevious={pagination.prevPage} onNext={pagination.nextPage} />}
     </div>
   )
 }
@@ -1856,7 +1890,7 @@ function CrearIncidencia({ onCreate, settings, notifyError, onBack }) {
   const [form, setForm] = useState({ title: '', description: '', category: '', priority: 'medium' })
   const [files, setFiles] = useState([])
   const categories = settings?.categories || []
-  
+
   const handleFileSelect = (e) => {
     const newFiles = Array.from(e.target.files || [])
     setFiles([...files, ...newFiles])
@@ -2101,6 +2135,8 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
   const [comments, setComments] = useState([])
   const [attachments, setAttachments] = useState([])
   const [uploadFile, setUploadFile] = useState(null)
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editingCommentText, setEditingCommentText] = useState('')
 
   useEffect(() => {
     if (incident?.status?.name) {
@@ -2170,6 +2206,37 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
     }
   }
 
+  const editComment = (commentId, text) => {
+    setEditingCommentId(commentId)
+    setEditingCommentText(text)
+  }
+
+  const saveEditingComment = async () => {
+    if (!editingCommentText.trim() || editingCommentId === null) return
+    try {
+      await apiFetch(`/incidents/${incident.id}/comments/${editingCommentId}`, { method: 'PATCH', body: JSON.stringify({ comment: editingCommentText }) })
+      setEditingCommentId(null)
+      setEditingCommentText('')
+      const c = await apiFetch(`/incidents/${incident.id}/comments`)
+      setComments(c.comments || [])
+      notifySuccess?.('Comentario actualizado correctamente')
+    } catch (error) {
+      notifyError?.(error.message || 'No se pudo actualizar el comentario')
+    }
+  }
+
+  const deleteComment = async (commentId) => {
+    if (!confirm('¿Eliminar comentario?')) return
+    try {
+      await apiFetch(`/incidents/${incident.id}/comments/${commentId}`, { method: 'DELETE' })
+      const c = await apiFetch(`/incidents/${incident.id}/comments`)
+      setComments(c.comments || [])
+      notifySuccess?.('Comentario eliminado correctamente')
+    } catch (error) {
+      notifyError?.(error.message || 'No se pudo eliminar el comentario')
+    }
+  }
+
   return (
     <div className="grid-2">
       <div className="panel">
@@ -2197,9 +2264,6 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
       </div>
       <div className="panel">
         <div className="panel__title">Acciones</div>
-        {!incident.assigned_to && onTakeOwnership && (
-          <button className="btn btn--primary" onClick={() => onTakeOwnership(incident.id)}>Coger incidencia</button>
-        )}
         {incident.assigned_to && incident.assigned_to !== currentUserId && (
           <div className="muted">Esta incidencia está asignada a otro técnico.</div>
         )}
@@ -2227,7 +2291,7 @@ function GestionarIncidencia({ incident, apiFetch, onUpdated, currentUserId, onT
         </ul>
         <div className="upload-row">
           <input id={`${formId}-upload`} type="file" aria-label="Subir adjunto" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
-          <button className="btn btn--primary" onClick={uploadAttachment}>Subir</button>
+          <button className="btn btn--primary upload-btn" onClick={uploadAttachment}>Subir</button>
         </div>
       </div>
       <div className="panel">
@@ -3099,6 +3163,36 @@ function mapStatusToApi(name) {
   if (name === 'resuelta') return 'resolved'
   if (name === 'cerrada') return 'closed'
   return 'open'
+}
+
+function Pagination({ currentPage, totalPages, canGoNext, canGoPrev, onPrevious, onNext }) {
+  return (
+    <div className="pagination">
+      <button
+        type="button"
+        className="pagination__btn"
+        disabled={!canGoPrev}
+        title="Página anterior"
+        onClick={onPrevious}
+        aria-label="Página anterior"
+      >
+        ← Anterior
+      </button>
+      <span className="pagination__info">
+        Página {currentPage} de {totalPages}
+      </span>
+      <button
+        type="button"
+        className="pagination__btn"
+        disabled={!canGoNext}
+        title="Página siguiente"
+        onClick={onNext}
+        aria-label="Página siguiente"
+      >
+        Siguiente →
+      </button>
+    </div>
+  )
 }
 
 export default App
