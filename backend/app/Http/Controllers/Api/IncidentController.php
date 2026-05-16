@@ -114,8 +114,15 @@ class IncidentController extends Controller
             ->with(['creator', 'assignee', 'status'])
             ->orderByDesc('created_at');
 
-        if ($roleName === 'jefe_empresa' || $roleName === 'tecnico') {
+        if ($roleName === 'jefe_empresa') {
             $query->where('company_id', $user->company_id);
+        } elseif ($roleName === 'tecnico') {
+            // For technicians: show available incidents (unassigned) OR their own assigned incidents
+            $query->where('company_id', $user->company_id)
+                ->where(function ($q) use ($user) {
+                    $q->whereNull('assigned_to')
+                      ->orWhere('assigned_to', $user->id);
+                });
         } elseif ($roleName === 'empleado') {
             $query->where('created_by', $user->id);
         } else {
@@ -441,6 +448,28 @@ class IncidentController extends Controller
         } else {
             return response()->json(['message' => 'Not authorized.'], 403);
         }
+
+        // Eliminación segura: garantiza que no queden registros huérfanos aunque
+        // la FK de la BD no tenga ON DELETE CASCADE configurado correctamente.
+        // 1) adjuntos + archivos físicos
+        foreach ($incident->attachments()->get() as $attachment) {
+            if ($attachment->file_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($attachment->file_path);
+            }
+            $attachment->delete();
+        }
+
+        // 2) comentarios
+        $incident->comments()->delete();
+
+        // 3) notificaciones relacionadas (si se persisten por tipo/ID)
+        \App\Models\Notification::whereIn('user_id', [$incident->assigned_to, $incident->created_by])
+            ->where('type', 'incident_created:' . $incident->id)
+            ->orWhere(function ($q) use ($incident) {
+                $q->where('type', 'incident_assigned:' . $incident->id)
+                  ->whereIn('user_id', [$incident->assigned_to, $incident->created_by]);
+            })
+            ->delete();
 
         $incident->delete();
 

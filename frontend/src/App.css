@@ -6,17 +6,19 @@
   min-height: 100vh;
 }
 
+/* Asegura que sidebar y contenido se estiren y queden alineados en altura */
 .sidebar {
   background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%);
   color: #cbd5f5;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  min-height: 100vh;
+  align-self: stretch;
+  min-height: 0; /* importante para flex items */
   overflow: hidden;
   padding: 24px 18px;
   gap: 18px;
 }
+
 
 .sidebar__brand {
   display: flex;
@@ -66,6 +68,7 @@
   gap: 6px;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .nav-item {
@@ -79,11 +82,22 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
+  height: 44px;
+  line-height: 1;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  transition: background-color 0.15s, color 0.15s;
+  flex-shrink: 0;
 }
 
 .nav-item.active {
   background: var(--brand-primary);
   color: #fff;
+}
+
+.nav-item:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .icon {
@@ -786,13 +800,16 @@
   height: 42px;
 }
 
-.upload-row .btn {
+.upload-row .btn,
+.upload-row .upload-btn {
   min-width: 88px;
   height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin: 0;
+  padding: 10px 16px;
+  white-space: nowrap;
 }
 
 .main {
@@ -868,6 +885,13 @@
   border-radius: 16px;
   padding: 18px;
   margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel.form {
+  min-height: auto;
+  max-height: none;
 }
 
 .panel__title {
@@ -1120,6 +1144,16 @@
 .btn--success { background: #059669; color: #fff; width: 100%; margin: 12px 0; }
 .btn--ghost { background: #f1f5f9; color: #334155; width: 100%; }
 
+/* Botón de crear/acciones principales en formularios: evitar que se estire demasiado */
+.panel.form > .btn--primary:not(.fullwidth),
+.panel.form > button.btn--primary:not(.fullwidth),
+.panel.form .btn--primary:not(.fullwidth) {
+  width: fit-content;
+  max-width: 100%;
+  /* separación justa para que no quede “pegado” al contenido */
+  margin-top: 8px;
+}
+
 .pill {
   display: inline-block;
   padding: 4px 10px;
@@ -1199,8 +1233,8 @@
 
 .comment { display: grid; grid-template-columns: 40px 1fr; gap: 12px; padding: 12px 0; }
 .comment__meta { font-size: 12px; color: #64748b; margin-bottom: 4px; }
-.comment__input { display: flex; gap: 10px; }
-.comment__input input { flex: 1; }
+.comment__input { display: flex; gap: 10px; align-items: center; }
+.comment__input input { flex: 1; min-height: 42px; }
 
 .detail-row { display: flex; justify-content: space-between; margin: 10px 0; }
 
@@ -1860,4 +1894,46 @@ a:focus-visible {
 .link:hover,
 .link:focus-visible {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pagination__btn {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.pagination__btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.pagination__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination__btn:active:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.pagination__info {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
 }

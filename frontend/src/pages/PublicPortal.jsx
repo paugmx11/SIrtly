@@ -138,7 +138,7 @@ function WelcomePage({ onGoLogin, onContactSubmit, notifyError, menuOpen, setMen
         <section className="landing__hero">
           <div className="landing__hero-copy">
             <div className="landing__eyebrow">Portal multiempresa para soporte técnico</div>
-            <h1>Sirtly ordena tu soporte.</h1>
+            <h1><span className="landing__sirtly-gradient">Sirtly</span> ordena tu soporte.</h1>
             <p>Incidencias, equipos y branding de empresa en un solo portal.</p>
 
             <div className="landing__hero-actions">
