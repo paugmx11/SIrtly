@@ -1744,7 +1744,7 @@ function IncidenciasList({ incidents, technicians = [], assignmentMode = 'manual
 
 function MisIncidencias({ incidents, onCreate, onEdit }) {
   const [search, setSearch] = useState('')
-  const rows = incidents.filter((i) => [i.title, i.description, i.category, i.creator?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
+  const rows = incidents.filter((i) => [i.title, i.description, i.category, i.creator?.name, i.assignee?.name, i.status?.name].join(' ').toLowerCase().includes(search.toLowerCase()))
   const pagination = usePagination(rows)
   return (
     <div className="panel">
@@ -1760,6 +1760,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
           <tr>
             <th>Título</th>
             <th>Empleado</th>
+            <th>Técnico</th>
             <th>Prioridad</th>
             <th>Estado</th>
             <th>Fecha</th>
@@ -1767,10 +1768,13 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
           </tr>
         </thead>
         <tbody>
-          {pagination.currentItems.map((i) => (
+          {pagination.currentItems.map((i) => {
+            const assigneeName = [i.assignee?.name, i.assignee?.last_name].filter(Boolean).join(' ') || 'Sin asignar'
+            return (
             <tr key={i.id}>
               <td>{i.title}</td>
               <td>{i.creator?.name || '-'}</td>
+              <td>{assigneeName}</td>
               <td><span className={`pill ${priorityClass(i.priority)}`}>{labelPriority(i.priority)}</span></td>
               <td><span className={`pill ${statusClass(labelStatus(i.status?.name))}`}>{labelStatus(i.status?.name)}</span></td>
               <td>{formatDate(i.created_at)}</td>
@@ -1778,7 +1782,7 @@ function MisIncidencias({ incidents, onCreate, onEdit }) {
                 <button type="button" className="icon-btn" aria-label={`Editar incidencia ${i.title}`} onClick={() => onEdit(i.id)}>✏️</button>
               </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
       <div className="panel__footer">{rows.length} registros encontrados</div>
