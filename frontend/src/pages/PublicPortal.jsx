@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './PublicPortal.css'
 import sirtlyLogo from '../assets/Logo Sirtly.png'
 
@@ -8,6 +8,7 @@ const LICENSE_ASSETS_URL = 'https://github.com/paugmx11/SIrtly/blob/main/LICENSE
 export default function PublicPortal({ onLogin, onContactSubmit, notifyError, initialView = 'welcome', onPublicViewChange }) {
   const [publicView, setPublicView] = useState(readPublicViewFromHash(initialView))
   const [menuOpen, setMenuOpen] = useState(false)
+  const isPublicNavigationFromHistory = useRef(false)
 
   useEffect(() => {
     setPublicView(readPublicViewFromHash(initialView))
@@ -15,9 +16,21 @@ export default function PublicPortal({ onLogin, onContactSubmit, notifyError, in
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      if (isPublicNavigationFromHistory.current) {
+        isPublicNavigationFromHistory.current = false
+        onPublicViewChange?.(publicView)
+        return
+      }
+
       const nextHash = publicView === 'login' ? '#login' : ''
       if (window.location.hash !== nextHash) {
-        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`)
+        const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`
+        const hasKnownPublicHash = window.location.hash === '' || window.location.hash === '#login'
+        if (!hasKnownPublicHash && nextHash === '') {
+          window.history.replaceState(null, '', nextUrl)
+        } else {
+          window.history.pushState(null, '', nextUrl)
+        }
       }
     }
     onPublicViewChange?.(publicView)
@@ -26,6 +39,7 @@ export default function PublicPortal({ onLogin, onContactSubmit, notifyError, in
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     const handleHashChange = () => {
+      isPublicNavigationFromHistory.current = true
       setPublicView(readPublicViewFromHash(initialView))
     }
     window.addEventListener('hashchange', handleHashChange)
