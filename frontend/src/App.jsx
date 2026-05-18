@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import PublicPortal from './pages/PublicPortal.jsx'
 import sirtlyLogo from './assets/Logo Sirtly.png'
@@ -70,6 +70,7 @@ const COLOR_PRESETS = [
 const SESSION_STORAGE_KEY = 'sirtly.session'
 const CLOSED_STATUS_NAMES = ['resuelta', 'cerrada']
 const ACTIVE_STATUS_NAMES = ['abierta', 'en_progreso']
+const APP_VIEW_HASH_PREFIX = '#view='
 const ROLE_DEFAULT_VIEWS = {
   admin: 'admin-empresas',
   supervisor: 'sup-empresas',
@@ -99,6 +100,8 @@ function App() {
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [brandLogoSrc, setBrandLogoSrc] = useState(null)
   const [brandFaviconSrc, setBrandFaviconSrc] = useState(null)
+  const isNavigatingFromHistory = useRef(false)
+  const didReadInitialHashView = useRef(false)
 
   useLayoutEffect(() => {
     const settings = savedSession.settings
@@ -419,6 +422,78 @@ function App() {
     setNotificationsOpen(false)
     setProfileMenuOpen(false)
   }, [view, token, role])
+
+  useEffect(() => {
+    if (!token) return undefined
+    if (typeof window === 'undefined') return undefined
+
+    const applyHashView = () => {
+      const hashView = readAppViewFromHash()
+      if (!hashView) return
+      if (!isValidViewForRole(hashView, role)) return
+      isNavigatingFromHistory.current = true
+      setView((currentView) => (currentView === hashView ? currentView : hashView))
+    }
+
+    if (!didReadInitialHashView.current) {
+      didReadInitialHashView.current = true
+      applyHashView()
+    }
+
+    window.addEventListener('hashchange', applyHashView)
+    return () => window.removeEventListener('hashchange', applyHashView)
+  }, [token, role])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    if (!token) {
+      didReadInitialHashView.current = false
+      return
+    }
+
+    if (!isValidViewForRole(view, role)) return
+
+    if (isNavigatingFromHistory.current) {
+      isNavigatingFromHistory.current = false
+      return
+    }
+
+    const nextHash = buildAppViewHash(view)
+    if (window.location.hash === nextHash) {
+      return
+    }
+
+    const nextUrl = `${window.location.pathname}${window.location.search}${nextHash}`
+    if (!window.location.hash || !window.location.hash.startsWith(APP_VIEW_HASH_PREFIX)) {
+      if (window.location.hash === '#login') {
+        window.history.pushState(null, '', nextUrl)
+        return
+      }
+      window.history.replaceState(null, '', nextUrl)
+      return
+    }
+    window.history.pushState(null, '', nextUrl)
+  }, [token, role, view])
+
+  useEffect(() => {
+    if (!token) return undefined
+    if (typeof window === 'undefined') return undefined
+
+    const leavePrivateArea = () => {
+      const hash = window.location.hash || ''
+      if (hash.startsWith(APP_VIEW_HASH_PREFIX)) return
+      setPublicView('login')
+      resetSession()
+    }
+
+    window.addEventListener('popstate', leavePrivateArea)
+    window.addEventListener('hashchange', leavePrivateArea)
+    return () => {
+      window.removeEventListener('popstate', leavePrivateArea)
+      window.removeEventListener('hashchange', leavePrivateArea)
+    }
+  }, [token])
 
   const resetSession = () => {
     setUser(null)
@@ -2648,6 +2723,23 @@ function SuggestionInput({ id, label, value, onChange, placeholder, suggestions,
 function sanitizePhone(value) {
   const cleaned = value.replace(/[^0-9+\s()-]/g, '')
   return cleaned.startsWith('+34') ? cleaned : cleaned.replace(/^\+/, '')
+}
+
+function buildAppViewHash(view) {
+  return `${APP_VIEW_HASH_PREFIX}${encodeURIComponent(view || '')}`
+}
+
+function readAppViewFromHash() {
+  if (typeof window === 'undefined') return ''
+  const hash = window.location.hash || ''
+  if (!hash.startsWith(APP_VIEW_HASH_PREFIX)) return ''
+  const rawView = hash.slice(APP_VIEW_HASH_PREFIX.length)
+  if (!rawView) return ''
+  try {
+    return decodeURIComponent(rawView)
+  } catch {
+    return rawView
+  }
 }
 
 function bootstrapStoredBranding() {
